@@ -2,13 +2,13 @@
 
 > 各サブタスクは1〜3時間を目安とする。`(P)`は、依存する公開境界が設計で固定されており、他タスクと異なるファイル境界で並行できる作業を示す。
 
-- [ ] 1. 実装ワークスペースと共有境界を確立する
+- [x] 1. 実装ワークスペースと共有境界を確立する
 - [x] 1.1 pnpmワークスペースにWeb、attestation worker、contracts、SDK/sharedの実行境界を追加する
   - TypeScriptの厳格な検査、Biome、環境変数の安全な読み込みを各実行境界へ適用する。
   - Coston2、XRPL Testnet、単一XRP資産、テスト用rfUSDというMVP制限を共有設定として表現する。
   - 各workspaceが単独で検査・テストできる入口を用意する。
   - _Requirements: 1.1, 1.2, 11.2, 11.3_
-- [ ] 1.2 共有SDKに金額、状態、イベント、エラーの型付き契約を定義する
+- [x] 1.2 共有SDKに金額、状態、イベント、エラーの型付き契約を定義する
   - drops、WAD、BPS、アドレス、account ID、proof IDを区別し、浮動小数点と`any`を境界から排除する。
   - Risk snapshot、credit position、attestation record、Activity event、契約エラーをWeb・worker・contractsで一貫して扱えるようにする。
   - 単位変換とエラー表示の境界をテスト可能な純粋関数として公開する。

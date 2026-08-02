@@ -1,3 +1,4 @@
+export * from "./domain.js";
 export type {
   WebRuntimeConfig,
   WorkerRuntimeConfig,
