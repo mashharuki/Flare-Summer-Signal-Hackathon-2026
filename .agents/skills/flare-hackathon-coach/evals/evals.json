@@ -1,0 +1,47 @@
+{
+  "skill_name": "flare-hackathon-coach",
+  "evals": [
+    {
+      "id": 0,
+      "eval_name": "ideation-from-scratch",
+      "prompt": "Flareの DoraHacks Flare Summer Signal ハッカソンに出ようと思ってます。2人チーム(Solidity中級+フロントエンド)、残り5日くらい。まだ何を作るか全然決まってません。一緒にアイデア考えてください",
+      "expected_output": "FTSO/FDC/FAssets/Smart Accounts/TEEのうち複数を因果関係でつなぐアイデアを2〜3個、チーム規模(2人)と残り日数(5日)に見合った難易度で提案する。単なる候補列挙で終わらず、Flare固有性テストやアンチパターンへの言及がある。",
+      "files": [],
+      "assertions": [
+        "複数(2つ以上)のFlareネイティブ機能(FTSO/FDC/FAssets/Smart Accounts/TEE)を挙げ、それらが因果関係で繋がった具体的なアイデアを最低2つ提案している",
+        "提案するアイデアの難易度・スコープが2人チーム・残り5日という制約に見合っている(過度に壮大な多機能プロジェクトを勧めていない)",
+        "FTSOを単なる価格表示に使うだけの弱いアイデア、またはFDCをmockしたままにする等のアンチパターンを避けるよう注意喚起している",
+        "推奨ネットワークとしてCoston2(またはテストネット)に言及している",
+        "ユーザーに一方的にアイデアを押し付けず、選択や絞り込みのための判断軸(実現性・審査基準適合など)を示している"
+      ]
+    },
+    {
+      "id": 1,
+      "eval_name": "mvp-scope-convergence",
+      "prompt": "XRPユーザー向けにFlareでYield Vaultを作ろうと思っています。FTSOとFAssetsとSmart Accountsを使いたいんですが範囲が広すぎる気がします。ハッカソンの期間で完成できる形に絞ってほしいです",
+      "expected_output": "対応資産・チェーン・attestation type・アクションを1つずつに絞り込む提案をし、削るべき範囲(やらないことリスト)を明示する。単一Oracle更新をそのまま資金移動に繋げない等の防御原則にも触れる。",
+      "files": [],
+      "assertions": [
+        "対応資産・外部チェーン・attestation type・決済アクションをそれぞれ1つに絞り込む具体的な提案をしている",
+        "「やらないことリスト」または明示的なスコープ削減(何を今回は対応しないか)を提示している",
+        "単一のFTSO価格更新をそのまま清算や全資金移動に直結させない、という防御的な設計原則に触れている",
+        "Happy Pathを1文で表現する、または失敗ケース(stale price/timeout等)を最低1つ実演すべきと助言している",
+        "元の3機能(FTSO/FAssets/Smart Accounts)すべてを無条件に肯定するのではなく、優先順位付けや取捨選択を促している"
+      ]
+    },
+    {
+      "id": 2,
+      "eval_name": "pitch-and-readme-polish",
+      "prompt": "提出まであと1日です。READMEとピッチ構成を見てほしいです。プロジェクトはXRPの入金をFDCで証明してstablecoinを貸し出すやつです",
+      "expected_output": "3分ピッチの構成(問題→Flareが必要な理由→デモ→アーキテクチャ/次の一歩)とREADME必須項目(live URL, OSS repo, デプロイ済みcontract address, セットアップ, テストコマンド)を具体的に提示する。",
+      "files": [],
+      "assertions": [
+        "3分程度のピッチ構成を「問題提示→なぜFlareが必要か→ライブデモ→アーキテクチャ/セキュリティ/次の一歩」のような順序で具体的に提示している",
+        "README必須項目として、live URL・OSSリポジトリ・デプロイ済みcontract address・セットアップ手順・テストコマンドの少なくとも4つに言及している",
+        "デモの状態遷移(Submitted/Awaiting attestation/Verified/Settled等)をUIで見せることを提案している、またはFDC待機中の見せ方に言及している",
+        "mainnet未提供の機能をmainnet対応であるかのように誤解させない、mockした部分を明示する、といった正直さ・信頼性の観点に触れている",
+        "ユーザーが述べた具体的なプロジェクト内容(XRP入金をFDCで証明しstablecoinを貸し出す)に即した助言になっている(一般論だけで終わっていない)"
+      ]
+    }
+  ]
+}
