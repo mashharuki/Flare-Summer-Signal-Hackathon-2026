@@ -1,0 +1,132 @@
+# Implementation Plan
+
+> 各サブタスクは1〜3時間を目安とする。`(P)`は、依存する公開境界が設計で固定されており、他タスクと異なるファイル境界で並行できる作業を示す。
+
+- [ ] 1. 実装ワークスペースと共有境界を確立する
+- [ ] 1.1 pnpmワークスペースにWeb、attestation worker、contracts、SDK/sharedの実行境界を追加する
+  - TypeScriptの厳格な検査、Biome、環境変数の安全な読み込みを各実行境界へ適用する。
+  - Coston2、XRPL Testnet、単一XRP資産、テスト用rfUSDというMVP制限を共有設定として表現する。
+  - 各workspaceが単独で検査・テストできる入口を用意する。
+  - _Requirements: 1.1, 1.2, 11.2, 11.3_
+- [ ] 1.2 共有SDKに金額、状態、イベント、エラーの型付き契約を定義する
+  - drops、WAD、BPS、アドレス、account ID、proof IDを区別し、浮動小数点と`any`を境界から排除する。
+  - Risk snapshot、credit position、attestation record、Activity event、契約エラーをWeb・worker・contractsで一貫して扱えるようにする。
+  - 単位変換とエラー表示の境界をテスト可能な純粋関数として公開する。
+  - _Requirements: 1.3, 5.1, 6.2, 6.3, 10.4_
+
+- [ ] 2. Coston2上の準備金・リスク・信用コントラクトを実装する
+- [ ] 2.1 テスト用rfUSDと初期流動性を実装する (P)
+  - Coston2限定のrfUSDを発行し、デプロイ時にVaultへ1,000,000 rfUSDを供給する。
+  - Vaultへの供給後にmint権限を撤回し、トークンの供給経路とテスト専用であることを明確にする。
+  - Vault残高不足時に借入が原子的に失敗することを確認する。
+  - _Requirements: 7.2, 8.2, 11.1, 11.2_
+  - _Boundary: packages/contracts token domain_
+  - _Depends: 1.1_
+- [ ] 2.2 検証済みXRPL準備金台帳を実装する (P)
+  - 承認済み借入者が`testXRP`の準備金アカウントを登録・表示できるようにする。
+  - `XRPPayment`をオンチェーンで検証し、借入者、proof owner、対象アドレス、成功状態、外部ledger順序、proof IDの一意性を検査する。
+  - 有効な入金・出金だけでdrops残高、最終検証時刻、履歴イベントを更新し、失敗・不一致・重複proofは状態を変更しない。
+  - _Requirements: 2.1, 2.2, 2.3, 2.4, 3.3, 3.4, 3.5, 4.1, 4.2, 4.3, 4.4, 4.5_
+  - _Boundary: packages/contracts reserve domain_
+  - _Depends: 1.1, 1.2_
+- [ ] 2.3 FTSO評価とリスク状態の導出を実装する (P)
+  - Contract RegistryからCoston2のTestFtsoV2を解決し、XRP/USDの価格とタイムスタンプを取得する。
+  - 固定済みのHaircut、Advance Rate、TTL、Warning、Margin Call閾値で、保守的な丸めの評価額、信用枠、利用可能額、healthを導出する。
+  - 価格・準備金の鮮度切れ、凍結、負債ゼロ、価格下落シミュレーションを一貫した状態として返す。
+  - _Requirements: 5.1, 5.2, 5.3, 5.4, 6.1, 6.2, 6.3, 6.4, 6.5, 9.1, 9.2, 9.3, 9.4_
+  - _Boundary: packages/contracts risk domain_
+  - _Depends: 1.1, 1.2_
+- [ ] 2.4 信用ポジション、借入、返済、緊急停止を実装する
+  - 借入前に現在のrisk snapshotを必ず評価し、Healthy、鮮度内、未停止、与信枠内の場合だけrfUSDと負債を更新する。
+  - 返済は全リスク状態で許可し、allowance・残高・返済上限を検査してから`transferFrom`と負債減額を原子的に実行する。
+  - Risk Adminだけが新規借入停止、凍結、リスク設定更新を実行できるようにし、すべての状態変更をイベント化する。
+  - _Requirements: 1.3, 6.2, 6.3, 6.5, 7.2, 7.3, 7.4, 7.5, 8.2, 8.3, 8.4, 9.2, 9.3, 9.4, 9.5_
+  - _Depends: 2.1, 2.2, 2.3_
+- [ ] 2.5 デプロイ・設定・デモ準備を自動化する
+  - Coston2へのデプロイ順、Risk Admin、承認済み借入者、初期リスク設定、rfUSD供給、mint権限撤回を再現可能にする。
+  - Contract Registry経由の公式プロトコル解決を確認し、固定アドレスや秘密鍵をリポジトリへ残さない。
+  - デモ用のXRPL入金・出金証明fixtureと、各契約アドレスをWeb／workerへ安全に渡す設定を出力する。
+  - _Requirements: 1.1, 3.1, 7.2, 9.4, 11.1, 11.2_
+  - _Depends: 2.1, 2.2, 2.3, 2.4_
+
+- [ ] 3. FDC証明の非同期Coordinatorを実装する
+- [ ] 3.1 証明進行状態の永続化と再開を実装する (P)
+  - request bytes hashを一意キーとして、準備、提出、確定待ち、proof ready、完了、失敗、期限切れを保存する。
+  - 再起動後も同一依頼を再開し、同一依頼への複数refreshが別recordを作らないようにする。
+  - 金融上の正本をSQLiteへ保存せず、オンチェーンイベントを完了状態の唯一の根拠とする。
+  - _Requirements: 3.2, 3.4, 10.4, 10.5_
+  - _Boundary: apps/attestation-worker persistence domain_
+  - _Depends: 1.1, 1.2_
+- [ ] 3.2 Verifier準備、FDC fee、提出receipt検証を実装する
+  - 登録済みborrowerからproof ownerを導出し、`testXRP`向けの型付き証明依頼を準備する。
+  - 同一request bytesのFDC feeを動的に取得し、Webへrequired C2FLR額、期限、request hashを返す。
+  - Webが送ったFdcHub receiptを検証し、クライアント入力に依存せずround IDを算出して提出状態へ遷移する。
+  - _Requirements: 3.1, 3.2, 3.4, 3.5, 9.4_
+  - _Depends: 3.1, 2.5_
+- [ ] 3.3 ラウンド確定、DA Layer取得、最終proof提出の連携を実装する
+  - Relay確定を追跡し、確定前・DA障害・期限切れを安全な状態とエラーへ写像する。
+  - 取得したproofを不透明な型付きpayloadとしてWebへ返し、借入者ウォレットがReserveFlowCoreへ最終提出できるようにする。
+  - Coreの成功または拒否イベントを確認して、Coordinatorの状態と履歴を`VERIFIED`または`FAILED`へ確定する。
+  - _Requirements: 3.2, 3.3, 3.4, 3.5, 4.1, 4.2, 4.5, 10.4_
+  - _Depends: 3.2, 2.2_
+
+- [ ] 4. 利用者向けの信用ダッシュボードと取引体験を実装する
+- [ ] 4.1 Coston2接続とMVP安全境界を実装する (P)
+  - ウォレット接続時にCoston2以外を拒否し、対象がXRPL Testnet XRPだけであることを明示する。
+  - 画面の恒常的な位置に「テスト用rfUSD・本番融資ではない」表示を置く。
+  - 型付きSDKを通して契約・Coordinatorを呼び出し、未接続・誤ネットワーク・環境未設定を回復可能なUI状態にする。
+  - _Requirements: 1.1, 1.2, 11.1, 11.2, 11.3_
+  - _Boundary: apps/web application shell_
+  - _Depends: 1.1, 1.2_
+- [ ] 4.2 準備金登録とFDC証明タイムラインを実装する
+  - XRPLアドレス形式を検証し、登録済み準備金のチェーン、資産、アドレス、承認／検証状態を表示する。
+  - トランザクション識別子の提出、必要C2FLR額、ユーザー署名、確定待ち、proof ready、成功・失敗理由を段階的に表示する。
+  - 有効proofの最終提出後に、準備金残高、最終検証時刻、証明状態を更新する。
+  - _Requirements: 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 4.4, 4.5_
+  - _Depends: 2.2, 3.3, 4.1_
+- [ ] 4.3 信用ダッシュボードとリスク説明を実装する
+  - 準備金評価額、リスク調整後価値、Haircut、LTV、信用枠、利用可能額、負債、health、価格・証明鮮度を同一snapshotから表示する。
+  - リスク状態と借入可否を明示し、stale・warning・margin call・凍結の理由と回復行動を表示する。
+  - 価格下落率の入力に対し、オンチェーン状態を変更しない想定信用枠とhealthを表示する。
+  - _Requirements: 1.3, 5.4, 6.2, 6.3, 6.4, 6.5, 9.1, 9.2, 9.3, 9.5, 10.1, 10.2, 10.3_
+  - _Depends: 2.3, 2.4, 4.1_
+- [ ] 4.4 借入と返済の取引体験を実装する
+  - 借入入力に対し、借入後の負債、利用可能額、healthを表示し、ブロック要因を事前に表示する。
+  - 借入成功・信用枠超過・stale・危険状態・停止を、契約エラーコードに基づく行動可能な表示へ変換する。
+  - 返済時にrfUSD残高とallowanceを確認し、不足時はapprovalを先に完了させてから返済する。返済成功後はsnapshotと履歴を更新する。
+  - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 8.1, 8.2, 8.3, 8.4_
+  - _Depends: 2.4, 4.3_
+- [ ] 4.5 Activityと監視表示を実装する
+  - 準備金、証明、与信、借入、返済、アラート、緊急停止のオンチェーン／Coordinatorイベントを時系列で表示する。
+  - 利用者自身のポジションだけを新しい順に表示し、各イベントの結果と取引識別子を確認可能にする。
+  - 最終同期時刻と証明進行を表示し、未確定データを検証済みまたはリアルタイムとして扱わない。
+  - _Requirements: 3.2, 3.4, 4.4, 5.4, 9.5, 10.1, 10.2, 10.4, 10.5_
+  - _Depends: 3.3, 4.2, 4.3, 4.4_
+
+- [ ] 5. 重要経路を検証し、ハッカソンデモを再現可能にする
+- [ ] 5.1 コントラクトの単体・fuzz・invariantテストを追加する (P)
+  - 入出金、失敗proof、proof owner不一致、重複proof、順序逆転、台帳超過出金を検証する。
+  - 価格・準備金TTL、30% Haircut、50% Advance Rate、100%／120%閾値、保守的な丸めを検証する。
+  - 借入・返済・allowance・停止・権限境界について、失敗時にprincipalとトークン残高が部分更新されないことを検証する。
+  - _Requirements: 2.4, 3.3, 3.4, 3.5, 4.1, 4.2, 4.3, 4.5, 5.1, 5.2, 5.3, 6.1, 6.3, 6.5, 7.2, 7.3, 7.4, 7.5, 8.2, 8.3, 8.4, 9.2, 9.3, 9.4, 9.5_
+  - _Boundary: packages/contracts test suite_
+  - _Depends: 2.1, 2.2, 2.3, 2.4_
+- [ ] 5.2 CoordinatorとFDC統合のテストを追加する (P)
+  - Verifier準備、fee取得、receipt検証、round遷移、DA障害、再起動再開、Coreイベントによる完了確定をfixtureで検証する。
+  - request bytes hashの一意性、proof ownerの固定、fee不足時の阻止を検証する。
+  - 実ネットワークに依存しないテストと、Coston2で任意に実行できるスモークテストを分離する。
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 9.4, 10.4_
+  - _Boundary: apps/attestation-worker test suite_
+  - _Depends: 3.1, 3.2, 3.3_
+- [ ] 5.3 利用者のE2Eフローを検証する
+  - アカウント登録→FDC待機→証明反映→信用枠表示→借入→出金proof→借入停止→approval→返済を通しで検証する。
+  - 誤ネットワーク、対象外資産、無効アドレス、stale data、margin call、緊急停止の表示と回復導線を確認する。
+  - すべてのテストをCoston2のテスト用資産・fixtureに限定し、本番融資へ誤解される表示がないことを確認する。
+  - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 4.2, 4.3, 4.4, 4.5, 5.1, 5.2, 5.3, 5.4, 6.1, 6.2, 6.3, 6.4, 6.5, 7.1, 7.2, 7.3, 7.4, 7.5, 8.1, 8.2, 8.3, 8.4, 9.1, 9.2, 9.3, 9.4, 9.5, 10.1, 10.2, 10.3, 10.4, 10.5, 11.1, 11.2, 11.3_
+  - _Depends: 4.2, 4.3, 4.4, 4.5, 5.1, 5.2_
+- [ ] 5.4 デモ運用手順と品質ゲートを文書化する
+  - Coston2設定、必要なC2FLR、XRPL Testnet準備、環境変数、デプロイ、証明の待機時間、失敗時の再開手順を記載する。
+  - 開発、format、lint、contract test、worker test、E2Eの実行コマンドをroot READMEへ追加する。
+  - 本番融資ではないこと、外部残高証明の制限、FDC・FTSOの鮮度が借入条件であることをREADMEとデモ画面の記述で整合させる。
+  - _Requirements: 3.2, 5.3, 7.4, 9.4, 10.2, 11.1, 11.2, 11.3_
+  - _Depends: 2.5, 3.3, 4.5, 5.3_
