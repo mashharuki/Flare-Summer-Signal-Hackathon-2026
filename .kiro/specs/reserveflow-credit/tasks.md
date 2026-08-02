@@ -22,7 +22,7 @@
   - _Requirements: 7.2, 8.2, 11.1, 11.2_
   - _Boundary: packages/contracts token domain_
   - _Depends: 1.1_
-- [ ] 2.2 検証済みXRPL準備金台帳を実装する (P)
+- [x] 2.2 検証済みXRPL準備金台帳を実装する (P)
   - 承認済み借入者が`testXRP`の準備金アカウントを登録・表示できるようにする。
   - `XRPPayment`をオンチェーンで検証し、借入者、proof owner、対象アドレス、成功状態、外部ledger順序、proof IDの一意性を検査する。
   - 有効な入金・出金だけでdrops残高、最終検証時刻、履歴イベントを更新し、失敗・不一致・重複proofは状態を変更しない。
