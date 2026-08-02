@@ -29,7 +29,7 @@
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 3.3, 3.4, 3.5, 4.1, 4.2, 4.3, 4.4, 4.5_
   - _Boundary: packages/contracts reserve domain_
   - _Depends: 1.1, 1.2_
-- [ ] 2.3 FTSO評価とリスク状態の導出を実装する (P)
+- [x] 2.3 FTSO評価とリスク状態の導出を実装する (P)
   - Contract RegistryからCoston2のTestFtsoV2を解決し、XRP/USDの価格とタイムスタンプを取得する。
   - 固定済みのHaircut、Advance Rate、TTL、Warning、Margin Call閾値で、保守的な丸めの評価額、信用枠、利用可能額、healthを導出する。
   - 価格・準備金の鮮度切れ、凍結、負債ゼロ、価格下落シミュレーションを一貫した状態として返す。
