@@ -1,15 +1,23 @@
 {
-  "name": "Flare-Summer-Signal-Hackathon-2026",
+  "name": "reserveflow-credit",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "private": true,
   "scripts": {
     "format": "pnpm exec biome format --write .",
     "check": "pnpm exec biome check .",
-    "knip": "knip"
+    "knip": "pnpm exec knip",
+    "test": "pnpm --filter @reserveflow/shared test",
+    "typecheck": "pnpm --filter @reserveflow/shared typecheck && pnpm --filter @reserveflow/sdk typecheck && pnpm --filter @reserveflow/web typecheck && pnpm --filter @reserveflow/attestation-worker typecheck"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "packageManager": "pnpm@10.33.0"
+  "packageManager": "pnpm@10.33.0",
+  "devDependencies": {
+    "@biomejs/biome": "2.5.6",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.0.0"
+  }
 }

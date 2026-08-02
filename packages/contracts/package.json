@@ -1,0 +1,9 @@
+{
+  "name": "@reserveflow/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "test": "forge test",
+    "typecheck": "forge build"
+  }
+}
