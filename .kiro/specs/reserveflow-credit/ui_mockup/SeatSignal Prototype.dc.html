@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+<style>
+body{margin:0;box-sizing:border-box;-webkit-font-smoothing:antialiased;}
+*{box-sizing:border-box;}
+input[type=range]{-webkit-appearance:none;height:6px;border-radius:3px;background:#EFEAFB;outline:none;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#5B4EFF;box-shadow:0 2px 6px rgba(91,78,255,0.4);cursor:pointer;}
+a{color:#5B4EFF;}
+a:hover{color:#4636D6;}
+</style>
+</helmet>
+<div style="min-height:100vh;background:#F3EFEA;display:flex;flex-direction:column;align-items:center;padding:56px 24px 80px;font-family:'M PLUS Rounded 1c',sans-serif;">
+  <div style="text-align:center;margin-bottom:32px;">
+    <div style="display:inline-flex;align-items:center;gap:10px;">
+      <div style="width:36px;height:36px;border-radius:11px;background:linear-gradient(135deg,#5B4EFF,#1FC8A3);"></div>
+      <div style="font-size:22px;font-weight:800;color:#241F3D;letter-spacing:-0.02em;">SeatSignal</div>
+    </div>
+    <div style="margin-top:6px;font-size:14px;color:rgba(36,31,61,0.55);">Shipaton 2026 · UIプロトタイプ</div>
+  </div>
+
+  <div style="position:relative;">
+    <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402,874">
+      <div style="height:100%;display:flex;flex-direction:column;position:relative;background:#F3EFEA;overflow:hidden;">
+
+        <sc-if value="{{ isOnboard }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:1;display:flex;flex-direction:column;padding:58px 28px 30px;box-sizing:border-box;">
+            <div style="display:flex;justify-content:flex-end;">
+              <button onClick="{{ skipOnboard }}" style="border:none;background:none;color:rgba(36,31,61,0.45);font-size:14px;font-family:inherit;cursor:pointer;">スキップ</button>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:22px;">
+              <div style="width:140px;height:140px;border-radius:38px;background:{{ onboardIconBg }};display:flex;align-items:center;justify-content:center;position:relative;">
+                <div style="width:58px;height:58px;border-radius:50%;background:rgba(255,255,255,0.9);"></div>
+                <div style="position:absolute;width:80px;height:8px;border-radius:4px;background:rgba(255,255,255,0.55);bottom:36px;"></div>
+              </div>
+              <div style="font-size:23px;font-weight:800;color:#241F3D;line-height:1.4;max-width:280px;">{{ onboardTitle }}</div>
+              <div style="font-size:15px;color:rgba(36,31,61,0.6);line-height:1.7;max-width:280px;">{{ onboardBody }}</div>
+            </div>
+            <div style="display:flex;justify-content:center;gap:8px;margin-bottom:24px;">
+              <sc-for list="{{ onboardDots }}" as="d" hint-placeholder-count="3">
+                <div style="width:{{ d.size }};height:8px;border-radius:4px;background:{{ d.bg }};"></div>
+              </sc-for>
+            </div>
+            <button onClick="{{ nextOnboard }}" style="height:56px;border-radius:28px;border:none;background:#5B4EFF;color:#fff;font-size:16px;font-weight:700;font-family:inherit;cursor:pointer;">{{ onboardBtnLabel }}</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isHome }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:1;display:flex;flex-direction:column;padding:58px 20px 0;box-sizing:border-box;overflow-y:auto;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+              <div>
+                <div style="font-size:13px;color:rgba(36,31,61,0.5);">おはようございます</div>
+                <div style="font-size:21px;font-weight:800;color:#241F3D;">通勤ルートを検索</div>
+              </div>
+              <button onClick="{{ openPaywallFromHome }}" style="height:30px;padding:0 12px;border-radius:15px;border:none;background:{{ proBadgeBg }};color:{{ proBadgeColor }};font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;">{{ proBadgeLabel }}</button>
+            </div>
+
+            <div onClick="{{ search }}" style="background:#fff;border-radius:22px;padding:18px;box-shadow:0 8px 24px rgba(91,78,255,0.08);margin-bottom:14px;cursor:pointer;">
+              <div style="display:flex;align-items:center;gap:12px;">
+                <div style="width:10px;height:10px;border-radius:50%;background:#5B4EFF;flex-shrink:0;"></div>
+                <div style="flex:1;font-size:16px;font-weight:700;color:#241F3D;">新宿</div>
+              </div>
+              <div style="height:18px;border-left:2px dashed rgba(36,31,61,0.15);margin-left:4px;"></div>
+              <div style="display:flex;align-items:center;gap:12px;">
+                <div style="width:10px;height:10px;border-radius:2px;background:#1FC8A3;flex-shrink:0;"></div>
+                <div style="flex:1;font-size:16px;font-weight:700;color:#241F3D;">東京</div>
+              </div>
+              <div style="margin-top:12px;font-size:12px;color:rgba(36,31,61,0.5);">出発 8:10〜8:20 · 平日</div>
+            </div>
+
+            <div style="background:#fff;border-radius:22px;padding:18px;margin-bottom:14px;">
+              <div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(36,31,61,0.55);margin-bottom:10px;"><span>速さ優先</span><span>快適さ優先</span></div>
+              <input type="range" min="0" max="100" value="{{ prefValue }}" onChange="{{ onPrefChange }}" style="width:100%;"/>
+              <div style="margin-top:8px;text-align:center;font-size:13px;font-weight:700;color:#5B4EFF;">{{ prefLabel }}</div>
+            </div>
+
+            <div onClick="{{ search }}" style="display:flex;align-items:center;gap:10px;background:#EFEAFB;border-radius:16px;padding:12px 16px;margin-bottom:20px;cursor:pointer;">
+              <div style="width:28px;height:28px;border-radius:9px;background:#5B4EFF;flex-shrink:0;"></div>
+              <div style="flex:1;font-size:13px;font-weight:600;color:#241F3D;">通勤: 新宿 → 東京（平日 8:15）</div>
+              <div style="font-size:11px;color:rgba(36,31,61,0.4);">よく使う</div>
+            </div>
+
+            <button onClick="{{ search }}" style="height:56px;border-radius:28px;border:none;background:#5B4EFF;color:#fff;font-size:16px;font-weight:700;font-family:inherit;cursor:pointer;margin-bottom:20px;">快適ルートを検索</button>
+            <div style="flex:1;"></div>
+
+            <div style="display:flex;border-top:1px solid rgba(36,31,61,0.08);padding:10px 4px 4px;">
+              <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+                <button onClick="{{ t.go }}" style="flex:1;background:none;border:none;font-family:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;">
+                  <div style="width:22px;height:22px;border-radius:7px;background:{{ t.iconBg }};"></div>
+                  <div style="font-size:11px;font-weight:600;color:{{ t.color }};">{{ t.label }}</div>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isCompare }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:1;display:flex;flex-direction:column;padding:58px 20px 30px;box-sizing:border-box;overflow-y:auto;">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+              <button onClick="{{ goHome }}" style="width:36px;height:36px;border-radius:12px;border:none;background:#fff;font-size:16px;cursor:pointer;">←</button>
+              <div style="font-size:18px;font-weight:800;color:#241F3D;">新宿 → 東京</div>
+            </div>
+            <div style="font-size:13px;color:rgba(36,31,61,0.5);margin-bottom:16px;">3つのルートを比較して選択してください</div>
+
+            <sc-for list="{{ routesView }}" as="r" hint-placeholder-count="3">
+              <div onClick="{{ r.select }}" style="background:#fff;border-radius:20px;padding:18px;margin-bottom:14px;border:2px solid {{ r.borderColor }};cursor:pointer;position:relative;">
+                <sc-if value="{{ r.hasBadge }}" hint-placeholder-val="{{ false }}">
+                  <div style="position:absolute;top:-10px;right:16px;background:#1FC8A3;color:#fff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:10px;">{{ r.badge }}</div>
+                </sc-if>
+                <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">
+                  <div style="font-size:16px;font-weight:800;color:#241F3D;">{{ r.label }}</div>
+                  <div style="font-size:12px;color:rgba(36,31,61,0.5);">最速比 {{ r.diff }}</div>
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
+                  <div><div style="font-size:20px;font-weight:800;color:#241F3D;">{{ r.arrival }}</div><div style="font-size:11px;color:rgba(36,31,61,0.45);">到着 · {{ r.duration }}</div></div>
+                  <div style="text-align:right;"><div style="font-size:20px;font-weight:800;color:{{ r.accent }};">{{ r.standing }}</div><div style="font-size:11px;color:rgba(36,31,61,0.45);">予想立ち時間</div></div>
+                </div>
+                <div style="height:8px;border-radius:4px;background:#F0EEF7;overflow:hidden;margin-bottom:6px;">
+                  <div style="height:100%;width:{{ r.comfortWidth }};background:{{ r.accent }};border-radius:4px;"></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:11px;color:rgba(36,31,61,0.5);">
+                  <span>快適度スコア {{ r.comfort }}</span>
+                  <span>着座確率 {{ r.seatProbLabel }}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:1;display:flex;flex-direction:column;padding:58px 20px 30px;box-sizing:border-box;overflow-y:auto;">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+              <button onClick="{{ backToCompare }}" style="width:36px;height:36px;border-radius:12px;border:none;background:#fff;font-size:16px;cursor:pointer;">←</button>
+              <div style="font-size:17px;font-weight:800;color:#241F3D;">{{ detailLabel }}</div>
+            </div>
+
+            <div style="background:#fff;border-radius:20px;padding:18px;margin-bottom:14px;">
+              <div style="font-size:15px;font-weight:700;color:#241F3D;margin-bottom:4px;">{{ detail.train }} {{ detail.dest }}</div>
+              <div style="font-size:13px;color:rgba(36,31,61,0.55);line-height:1.6;">{{ detail.explanation }}</div>
+            </div>
+
+            <div style="background:#fff;border-radius:20px;padding:18px;margin-bottom:14px;position:relative;overflow:hidden;">
+              <div style="font-size:12px;font-weight:700;color:rgba(36,31,61,0.5);margin-bottom:12px;">推奨号車・乗車位置</div>
+              <sc-if value="{{ isPro }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;gap:8px;margin-bottom:12px;">
+                  <sc-for list="{{ carVisuals }}" as="c" hint-placeholder-count="8">
+                    <div style="flex:1;height:38px;border-radius:8px;background:{{ c.bg }};"></div>
+                  </sc-for>
+                </div>
+                <div style="font-size:14px;font-weight:700;color:#241F3D;">{{ detail.car }} ・ {{ detail.door }}</div>
+                <div style="font-size:12px;color:rgba(36,31,61,0.5);margin-top:4px;">{{ detail.waitPos }}</div>
+              </sc-if>
+              <sc-if value="{{ isNotPro }}" hint-placeholder-val="{{ true }}">
+                <div style="filter:blur(6px);pointer-events:none;">
+                  <div style="display:flex;gap:8px;margin-bottom:12px;">
+                    <sc-for list="{{ carVisuals }}" as="c2" hint-placeholder-count="8">
+                      <div style="flex:1;height:38px;border-radius:8px;background:{{ c2.bg }};"></div>
+                    </sc-for>
+                  </div>
+                  <div style="font-size:14px;font-weight:700;color:#241F3D;">6号車 ・ 中央ドア</div>
+                </div>
+                <button onClick="{{ openPaywallFromDetail }}" style="position:absolute;inset:44px 18px 18px;background:rgba(255,255,255,0.7);border:none;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#5B4EFF;cursor:pointer;font-family:inherit;text-align:center;">🔒 Proで号車・乗車位置を見る</button>
+              </sc-if>
+            </div>
+
+            <div style="background:#fff;border-radius:20px;padding:18px;margin-bottom:14px;position:relative;">
+              <div style="font-size:12px;font-weight:700;color:rgba(36,31,61,0.5);margin-bottom:12px;">途中駅ごとの着座予測</div>
+              <sc-for list="{{ stationsView }}" as="s" hint-placeholder-count="5">
+                <sc-if value="{{ s.visible }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                    <div style="width:70px;font-size:13px;font-weight:600;color:#241F3D;">{{ s.name }}</div>
+                    <div style="flex:1;height:8px;border-radius:4px;background:#F0EEF7;overflow:hidden;">
+                      <div style="height:100%;width:{{ s.probWidth }};background:{{ s.barColor }};border-radius:4px;"></div>
+                    </div>
+                    <div style="width:44px;text-align:right;font-size:12px;font-weight:700;color:rgba(36,31,61,0.6);">{{ s.probLabel }}</div>
+                  </div>
+                </sc-if>
+              </sc-for>
+              <sc-if value="{{ isNotPro }}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{ openPaywallFromDetail }}" style="width:100%;margin-top:6px;height:40px;border-radius:14px;border:none;background:#EFEAFB;color:#5B4EFF;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;">🔒 Proで全区間を見る</button>
+              </sc-if>
+            </div>
+
+            <div style="font-size:11px;color:rgba(36,31,61,0.4);margin-bottom:16px;">予測信頼度: {{ detail.confidence }}</div>
+
+            <button onClick="{{ startTripOrPaywall }}" style="height:56px;border-radius:28px;border:none;background:#5B4EFF;color:#fff;font-size:16px;font-weight:700;font-family:inherit;cursor:pointer;">{{ startTripLabel }}</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isCoach }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:1;display:flex;flex-direction:column;padding:58px 20px 30px;box-sizing:border-box;background:#241F3D;color:#fff;">
+            <div style="font-size:12px;color:rgba(255,255,255,0.5);margin-bottom:4px;">Live Comfort Coach</div>
+            <div style="font-size:18px;font-weight:800;margin-bottom:20px;">{{ coachTrain }}</div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <div style="font-size:13px;color:rgba(255,255,255,0.6);">{{ coachCurrentStation }}</div>
+              <div style="font-size:13px;color:rgba(255,255,255,0.6);">{{ coachNextStation }}</div>
+            </div>
+            <div style="height:6px;border-radius:3px;background:rgba(255,255,255,0.15);overflow:hidden;margin-bottom:24px;">
+              <div style="height:100%;width:{{ coachProgress }};background:#1FC8A3;border-radius:3px;"></div>
+            </div>
+
+            <div style="background:rgba(255,255,255,0.08);border-radius:22px;padding:22px;text-align:center;margin-bottom:16px;">
+              <div style="font-size:13px;color:rgba(255,255,255,0.55);margin-bottom:6px;">現在の予想立ち時間</div>
+              <div style="font-size:40px;font-weight:800;color:#1FC8A3;">{{ coachStandingLabel }}</div>
+            </div>
+
+            <div style="background:rgba(255,255,255,0.08);border-radius:18px;padding:16px;margin-bottom:16px;">
+              <div style="font-size:12px;color:rgba(255,255,255,0.5);margin-bottom:4px;">次の着座チャンス</div>
+              <div style="font-size:14px;font-weight:700;">{{ coachNotice }}</div>
+            </div>
+
+            <div style="flex:1;"></div>
+            <button onClick="{{ advanceStation }}" style="height:56px;border-radius:28px;border:none;background:#1FC8A3;color:#0E2A24;font-size:16px;font-weight:700;font-family:inherit;cursor:pointer;">{{ coachButtonLabel }}</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isFeedback }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:1;display:flex;flex-direction:column;padding:58px 20px 30px;box-sizing:border-box;overflow-y:auto;">
+            <sc-if value="{{ isFeedbackFormVisible }}" hint-placeholder-val="{{ true }}">
+              <div style="font-size:18px;font-weight:800;color:#241F3D;margin-bottom:6px;">お疲れ様でした</div>
+              <div style="font-size:13px;color:rgba(36,31,61,0.55);margin-bottom:20px;">今回の乗車について教えてください</div>
+
+              <div style="font-size:12px;font-weight:700;color:rgba(36,31,61,0.5);margin-bottom:10px;">座れましたか？</div>
+              <sc-for list="{{ choiceView }}" as="c" hint-placeholder-count="3">
+                <div onClick="{{ c.select }}" style="background:{{ c.bg }};border:2px solid {{ c.border }};border-radius:16px;padding:14px 16px;margin-bottom:10px;font-size:14px;font-weight:600;color:{{ c.color }};cursor:pointer;">{{ c.label }}</div>
+              </sc-for>
+
+              <sc-if value="{{ showStationPicker }}" hint-placeholder-val="{{ false }}">
+                <div style="font-size:12px;font-weight:700;color:rgba(36,31,61,0.5);margin:12px 0 10px;">どの駅で座れましたか？</div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+                  <sc-for list="{{ stationChoiceView }}" as="sc" hint-placeholder-count="3">
+                    <div onClick="{{ sc.select }}" style="padding:8px 14px;border-radius:14px;background:{{ sc.bg }};color:{{ sc.color }};font-size:13px;font-weight:600;cursor:pointer;">{{ sc.name }}</div>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <div style="font-size:12px;font-weight:700;color:rgba(36,31,61,0.5);margin:16px 0 10px;">予測との差（任意）</div>
+              <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px;">
+                <sc-for list="{{ detailChoiceView }}" as="d" hint-placeholder-count="3">
+                  <div onClick="{{ d.select }}" style="padding:12px 16px;border-radius:14px;background:{{ d.bg }};color:{{ d.color }};font-size:13px;font-weight:600;cursor:pointer;">{{ d.label }}</div>
+                </sc-for>
+              </div>
+
+              <div style="flex:1;"></div>
+              <button onClick="{{ submitFeedback }}" style="height:56px;border-radius:28px;border:none;background:{{ submitBg }};color:#fff;font-size:16px;font-weight:700;font-family:inherit;cursor:pointer;">送信する</button>
+            </sc-if>
+
+            <sc-if value="{{ isFeedbackSubmitted }}" hint-placeholder-val="{{ false }}">
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:16px;">
+                <div style="width:88px;height:88px;border-radius:50%;background:#1FC8A3;display:flex;align-items:center;justify-content:center;font-size:36px;color:#fff;">✓</div>
+                <div style="font-size:18px;font-weight:800;color:#241F3D;">フィードバックを送信しました</div>
+                <div style="font-size:14px;color:rgba(36,31,61,0.6);max-width:260px;line-height:1.7;">今週、SeatSignalは予想立ち時間を合計42分削減しました。</div>
+                <button onClick="{{ openPaywallFromFeedback }}" style="margin-top:8px;height:50px;padding:0 28px;border-radius:25px;border:none;background:#5B4EFF;color:#fff;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;">Proでレポートを見る</button>
+                <button onClick="{{ goHome }}" style="background:none;border:none;color:rgba(36,31,61,0.5);font-size:13px;font-family:inherit;cursor:pointer;">ホームに戻る</button>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isPaywall }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:1;display:flex;flex-direction:column;padding:58px 20px 30px;box-sizing:border-box;overflow-y:auto;background:linear-gradient(180deg,#241F3D 0%,#2E2853 100%);color:#fff;">
+            <div style="display:flex;justify-content:flex-end;margin-bottom:6px;">
+              <button onClick="{{ closePaywall }}" style="width:32px;height:32px;border-radius:10px;border:none;background:rgba(255,255,255,0.1);color:#fff;font-size:15px;cursor:pointer;">✕</button>
+            </div>
+
+            <sc-if value="{{ showPaywallOffer }}" hint-placeholder-val="{{ true }}">
+              <div style="text-align:center;margin-bottom:20px;">
+                <div style="font-size:21px;font-weight:800;margin-bottom:8px;">SeatSignal Pro</div>
+                <div style="font-size:13px;color:rgba(255,255,255,0.6);line-height:1.7;">今週、Proなら予想立ち時間を合計42分削減できていました</div>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
+                <sc-for list="{{ featureRows }}" as="f" hint-placeholder-count="6">
+                  <div style="display:flex;align-items:center;gap:10px;">
+                    <div style="width:20px;height:20px;border-radius:6px;background:#1FC8A3;flex-shrink:0;"></div>
+                    <div style="font-size:13px;color:rgba(255,255,255,0.85);">{{ f.label }}</div>
+                  </div>
+                </sc-for>
+              </div>
+
+              <sc-for list="{{ planView }}" as="p" hint-placeholder-count="2">
+                <div onClick="{{ p.select }}" style="border:2px solid {{ p.border }};background:{{ p.bg }};border-radius:18px;padding:16px;margin-bottom:12px;position:relative;cursor:pointer;">
+                  <sc-if value="{{ p.hasBadge }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;top:-9px;right:14px;background:#FFC94A;color:#241F3D;font-size:10px;font-weight:800;padding:3px 8px;border-radius:8px;">{{ p.badge }}</div>
+                  </sc-if>
+                  <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <div style="font-size:15px;font-weight:700;">{{ p.label }}</div>
+                    <div style="font-size:15px;font-weight:800;">{{ p.price }}</div>
+                  </div>
+                  <div style="font-size:12px;color:rgba(255,255,255,0.5);margin-top:2px;">{{ p.sub }}</div>
+                </div>
+              </sc-for>
+
+              <button onClick="{{ purchase }}" style="height:56px;border-radius:28px;border:none;background:#1FC8A3;color:#0E2A24;font-size:16px;font-weight:700;font-family:inherit;cursor:pointer;margin-top:6px;">7日間無料で試す</button>
+              <button onClick="{{ restorePurchase }}" style="background:none;border:none;color:rgba(255,255,255,0.5);font-size:12px;font-family:inherit;cursor:pointer;margin-top:14px;">購入を復元</button>
+              <div style="font-size:10px;color:rgba(255,255,255,0.3);text-align:center;margin-top:10px;line-height:1.6;">登録は自動更新されます。いつでも設定からキャンセルできます。</div>
+            </sc-if>
+
+            <sc-if value="{{ justPurchased }}" hint-placeholder-val="{{ false }}">
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:16px;">
+                <div style="width:88px;height:88px;border-radius:50%;background:#1FC8A3;display:flex;align-items:center;justify-content:center;font-size:36px;">✓</div>
+                <div style="font-size:19px;font-weight:800;">Proへようこそ</div>
+                <div style="font-size:13px;color:rgba(255,255,255,0.6);max-width:240px;line-height:1.7;">すべての機能が利用可能になりました</div>
+                <button onClick="{{ continueAfterPurchase }}" style="margin-top:8px;height:50px;padding:0 32px;border-radius:25px;border:none;background:#1FC8A3;color:#0E2A24;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;">続ける</button>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;bottom:70px;left:50%;transform:translateX(-50%);background:#241F3D;color:#fff;font-size:13px;padding:10px 18px;border-radius:20px;white-space:nowrap;z-index:100;">{{ toast }}</div>
+        </sc-if>
+
+      </div>
+    </x-import>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:520px;margin-top:28px;">
+    <sc-for list="{{ jumpItems }}" as="j" hint-placeholder-count="7">
+      <button onClick="{{ j.go }}" style="border:none;border-radius:16px;padding:8px 14px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;background:{{ j.bg }};color:{{ j.color }};">{{ j.label }}</button>
+    </sc-for>
+  </div>
+  <div style="margin-top:10px;font-size:12px;color:rgba(36,31,61,0.4);">画面下のボタンでいつでも別の画面にジャンプできます</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const ROUTES = [
+  { id: 'fastest', label: '最速', arrival: '8:55着', duration: '32分', diff: '±0分', standing: '27分', seatProbLabel: '15%', comfort: 42, comfortWidth: '42%', accent: '#8B85A8', badge: null },
+  { id: 'balanced', label: 'バランス', arrival: '8:58着', duration: '35分', diff: '+3分', standing: '16分', seatProbLabel: '45%', comfort: 68, comfortWidth: '68%', accent: '#5B4EFF', badge: null },
+  { id: 'comfort', label: '最も快適', arrival: '9:00着', duration: '37分', diff: '+5分', standing: '8分', seatProbLabel: '82%', comfort: 91, comfortWidth: '91%', accent: '#1FC8A3', badge: 'おすすめ' },
+];
+
+const ROUTE_DETAILS = {
+  fastest: {
+    train: '8:12発 快速', dest: '東京行', car: '2号車', door: '後方から2番目のドア', waitPos: 'ホーム後方（2号車）乗車位置',
+    carIndex: 1, accent: '#8B85A8', confidence: '高（実測データ 18件）',
+    explanation: '始発駅から混雑が続く路線のため、どの号車でも着座確率は低めです。速さを優先する場合に選択してください。',
+    stations: [
+      { name: '新宿（乗車）', prob: 15, standing: 27 },
+      { name: '代々木', prob: 18, standing: 22 },
+      { name: '原宿', prob: 22, standing: 16 },
+      { name: '渋谷', prob: 28, standing: 9 },
+      { name: '東京（下車）', prob: null, standing: 0 },
+    ],
+  },
+  balanced: {
+    train: '8:14発 通勤快速', dest: '東京行', car: '4号車', door: '中央ドア（2番）', waitPos: 'ホーム中央よりやや後方（4号車）乗車位置',
+    carIndex: 3, accent: '#5B4EFF', confidence: '中（実測データ 9件）',
+    explanation: '4号車は渋谷での乗換客の降車が多く、後半で着座確率が上昇します。',
+    stations: [
+      { name: '新宿（乗車）', prob: 35, standing: 16 },
+      { name: '代々木', prob: 40, standing: 13 },
+      { name: '原宿', prob: 52, standing: 9 },
+      { name: '渋谷', prob: 66, standing: 4 },
+      { name: '東京（下車）', prob: null, standing: 0 },
+    ],
+  },
+  comfort: {
+    train: '8:17発 各駅停車', dest: '東京行', car: '6号車', door: '中央ドア（3番）', waitPos: 'ホーム中央（6号車）乗車位置',
+    carIndex: 5, accent: '#1FC8A3', confidence: '高（実測データ 24件）',
+    explanation: '6号車は3駅先の代々木で降車が集中するため、着座確率が大きく上昇します。始発駅に近い編成のため、乗車時点でも比較的空いています。',
+    stations: [
+      { name: '新宿（乗車）', prob: 58, standing: 8 },
+      { name: '代々木', prob: 74, standing: 5 },
+      { name: '原宿', prob: 85, standing: 2 },
+      { name: '渋谷', prob: 92, standing: 1 },
+      { name: '東京（下車）', prob: null, standing: 0 },
+    ],
+  },
+};
+
+const ONBOARD = [
+  { title: '最速より、"快適"を。', body: '到着時間だけでなく、目的地までの予想立ち時間を比較してルートを選べます。', bg: 'linear-gradient(135deg,#5B4EFF,#8B7CFF)' },
+  { title: '号車・乗車位置までナビ', body: 'おすすめの号車やドア、ホームでの待機位置まで案内します。', bg: 'linear-gradient(135deg,#1FC8A3,#5FE0C4)' },
+  { title: 'あなたのデータは守られます', body: '快適性の計算は端末内で処理。移動履歴は保存せず、匿名IDのみを利用します。', bg: 'linear-gradient(135deg,#FF8A65,#FFC94A)' },
+];
+
+const FEEDBACK_CHOICES = [
+  { id: 'from_start', label: '最初から座れた' },
+  { id: 'partial', label: '途中から座れた' },
+  { id: 'standing', label: '最後まで立っていた' },
+];
+
+const DETAIL_CHOICES = [
+  { id: 'less_crowded', label: '予測より空いていた' },
+  { id: 'as_expected', label: '予測どおりだった' },
+  { id: 'more_crowded', label: '予測より混んでいた' },
+];
+
+const FEATURES = [
+  '快適ルート検索が無制限', '号車・ドア・乗車位置の詳細案内', '途中駅ごとの着座予測',
+  'Live Comfort Coach（乗車中のリアルタイム更新）', '複数の通勤ルートを保存', '広告非表示',
+];
+
+const SCREEN_LABELS = {
+  onboard: 'オンボーディング', home: 'ホーム', compare: 'ルート比較', detail: 'ルート詳細',
+  coach: 'ライブコーチ', feedback: 'フィードバック', paywall: 'Paywall',
+};
+
+class Component extends DCLogic {
+  state = {
+    screen: 'onboard',
+    onboardStep: 0,
+    prefValue: 70,
+    selectedRouteType: null,
+    isPro: false,
+    coachStationIndex: 0,
+    feedbackChoice: null,
+    feedbackStationIndex: null,
+    feedbackDetail: null,
+    feedbackSubmitted: false,
+    paywallPlan: 'annual',
+    paywallFrom: 'home',
+    priorScreen: 'home',
+    justPurchased: false,
+    toast: null,
+  };
+
+  toastTimer = null;
+
+  showToast = (msg) => {
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    this.setState({ toast: msg });
+    this.toastTimer = setTimeout(() => this.setState({ toast: null }), 1800);
+  };
+
+  nextOnboard = () => {
+    if (this.state.onboardStep >= 2) { this.setState({ screen: 'home' }); return; }
+    this.setState((s) => ({ onboardStep: s.onboardStep + 1 }));
+  };
+  skipOnboard = () => this.setState({ screen: 'home' });
+
+  onPrefChange = (e) => this.setState({ prefValue: Number(e.target.value) });
+
+  search = () => this.setState({ screen: 'compare' });
+  goHome = () => this.setState({ screen: 'home' });
+  backToCompare = () => this.setState({ screen: 'compare' });
+
+  openDetail = (id) => this.setState({ selectedRouteType: id, screen: 'detail' });
+
+  startTripOrPaywall = () => {
+    if (this.state.isPro) this.setState({ screen: 'coach', coachStationIndex: 0 });
+    else this.openPaywall('coach');
+  };
+
+  advanceStation = () => {
+    const detail = ROUTE_DETAILS[this.state.selectedRouteType || 'comfort'];
+    const last = detail.stations.length - 1;
+    if (this.state.coachStationIndex >= last) { this.endTrip(); return; }
+    this.setState((s) => ({ coachStationIndex: s.coachStationIndex + 1 }));
+  };
+  endTrip = () => this.setState({
+    screen: 'feedback', feedbackSubmitted: false, feedbackChoice: null,
+    feedbackStationIndex: null, feedbackDetail: null,
+  });
+
+  chooseFeedback = (id) => this.setState({ feedbackChoice: id, feedbackStationIndex: id === 'partial' ? this.state.feedbackStationIndex : null });
+  chooseStation = (name) => this.setState({ feedbackStationIndex: name });
+  chooseDetail = (id) => this.setState({ feedbackDetail: id });
+  submitFeedback = () => {
+    const c = this.state.feedbackChoice;
+    if (!c) return;
+    if (c === 'partial' && !this.state.feedbackStationIndex) return;
+    this.setState({ feedbackSubmitted: true });
+  };
+
+  openPaywall = (from) => this.setState({ paywallFrom: from, priorScreen: this.state.screen, screen: 'paywall', justPurchased: false });
+  openPaywallFromHome = () => { if (!this.state.isPro) this.openPaywall('home'); };
+  openPaywallFromDetail = () => this.openPaywall('detail');
+  openPaywallFromFeedback = () => this.openPaywall('feedback');
+  closePaywall = () => this.setState({ screen: this.state.priorScreen || 'home' });
+  selectPlan = (id) => this.setState({ paywallPlan: id });
+  purchase = () => this.setState({ isPro: true, justPurchased: true });
+  continueAfterPurchase = () => this.setState({ screen: this.state.paywallFrom || 'home', justPurchased: false });
+  restorePurchase = () => this.showToast('復元できる購入はありませんでした');
+
+  goTab = (label) => { if (label !== 'ホーム') this.showToast('この画面は準備中です'); };
+
+  jumpTo = (screen) => {
+    const patch = { screen };
+    if ((screen === 'detail' || screen === 'coach' || screen === 'feedback') && !this.state.selectedRouteType) patch.selectedRouteType = 'comfort';
+    if (screen === 'coach') patch.coachStationIndex = 0;
+    if (screen === 'feedback') { patch.feedbackSubmitted = false; patch.feedbackChoice = null; patch.feedbackStationIndex = null; patch.feedbackDetail = null; }
+    if (screen === 'paywall') { patch.paywallFrom = this.state.paywallFrom || 'home'; patch.priorScreen = this.state.screen; patch.justPurchased = false; }
+    this.setState(patch);
+  };
+
+  renderVals() {
+    const s = this.state;
+    const routeId = s.selectedRouteType || 'comfort';
+    const detail = ROUTE_DETAILS[routeId];
+    const routeMeta = ROUTES.find((r) => r.id === routeId);
+
+    const onboard = ONBOARD[s.onboardStep];
+    const onboardDots = ONBOARD.map((_, i) => ({
+      size: i === s.onboardStep ? '20px' : '8px',
+      bg: i === s.onboardStep ? '#5B4EFF' : '#E0DCF5',
+    }));
+
+    const routesView = ROUTES.map((r) => ({
+      ...r, hasBadge: !!r.badge,
+      borderColor: routeId === r.id ? r.accent : '#F0EEF7',
+      select: () => this.openDetail(r.id),
+    }));
+
+    const carVisuals = Array.from({ length: 8 }).map((_, i) => ({
+      bg: i === detail.carIndex ? detail.accent : '#F0EEF7',
+    }));
+
+    const stationsView = detail.stations.map((st, i) => ({
+      name: st.name,
+      visible: s.isPro || i < 2,
+      probLabel: st.prob === null ? '降車' : `${st.prob}%`,
+      probWidth: st.prob === null ? '0%' : `${st.prob}%`,
+      barColor: st.prob === null ? 'transparent' : detail.accent,
+    }));
+
+    const choiceView = FEEDBACK_CHOICES.map((c) => {
+      const sel = s.feedbackChoice === c.id;
+      return { ...c, select: () => this.chooseFeedback(c.id), bg: sel ? '#EFEAFB' : '#fff', border: sel ? '#5B4EFF' : '#F0EEF7', color: sel ? '#5B4EFF' : '#241F3D' };
+    });
+
+    const midStations = detail.stations.slice(1, -1).map((st) => st.name.replace(/（.*?）/g, ''));
+    const stationChoiceView = midStations.map((name) => {
+      const sel = s.feedbackStationIndex === name;
+      return { name, select: () => this.chooseStation(name), bg: sel ? '#5B4EFF' : '#EFEAFB', color: sel ? '#fff' : '#241F3D' };
+    });
+
+    const detailChoiceView = DETAIL_CHOICES.map((d) => {
+      const sel = s.feedbackDetail === d.id;
+      return { ...d, select: () => this.chooseDetail(d.id), bg: sel ? '#5B4EFF' : '#F5F3FB', color: sel ? '#fff' : '#241F3D' };
+    });
+
+    const canSubmit = !!s.feedbackChoice && (s.feedbackChoice !== 'partial' || !!s.feedbackStationIndex);
+
+    const tabs = [
+      { label: 'ホーム', iconBg: '#5B4EFF', color: '#5B4EFF', go: () => this.goTab('ホーム') },
+      { label: '通勤ルート', iconBg: '#D9D5F0', color: 'rgba(36,31,61,0.4)', go: () => this.goTab('通勤ルート') },
+      { label: 'レポート', iconBg: '#D9D5F0', color: 'rgba(36,31,61,0.4)', go: () => this.goTab('レポート') },
+      { label: '設定', iconBg: '#D9D5F0', color: 'rgba(36,31,61,0.4)', go: () => this.goTab('設定') },
+    ];
+
+    const stations = detail.stations;
+    const idx = Math.min(s.coachStationIndex, stations.length - 1);
+    const isLastStation = idx >= stations.length - 1;
+    const coachProgress = `${(idx / (stations.length - 1)) * 100}%`;
+
+    const planView = [
+      { id: 'monthly', label: '月額プラン', price: '¥680 / 月', sub: 'いつでも解約できます', hasBadge: false, badge: null },
+      { id: 'annual', label: '年額プラン', price: '¥5,400 / 年', sub: '月あたり ¥450 相当', hasBadge: true, badge: 'お得' },
+    ].map((p) => {
+      const sel = s.paywallPlan === p.id;
+      return { ...p, select: () => this.selectPlan(p.id), border: sel ? '#1FC8A3' : 'rgba(255,255,255,0.15)', bg: sel ? 'rgba(31,200,163,0.12)' : 'rgba(255,255,255,0.05)' };
+    });
+
+    const jumpItems = ['onboard', 'home', 'compare', 'detail', 'coach', 'feedback', 'paywall'].map((id) => ({
+      label: SCREEN_LABELS[id], go: () => this.jumpTo(id),
+      bg: s.screen === id ? '#5B4EFF' : '#fff', color: s.screen === id ? '#fff' : '#241F3D',
+    }));
+
+    return {
+      isOnboard: s.screen === 'onboard', isHome: s.screen === 'home', isCompare: s.screen === 'compare',
+      isDetail: s.screen === 'detail', isCoach: s.screen === 'coach', isFeedback: s.screen === 'feedback',
+      isPaywall: s.screen === 'paywall',
+      onboardTitle: onboard.title, onboardBody: onboard.body, onboardIconBg: onboard.bg,
+      onboardDots, onboardBtnLabel: s.onboardStep >= 2 ? 'はじめる' : '次へ',
+      nextOnboard: this.nextOnboard, skipOnboard: this.skipOnboard,
+
+      prefValue: s.prefValue,
+      prefLabel: s.prefValue < 33 ? '速さ重視' : s.prefValue > 66 ? '快適さ重視' : 'バランス重視',
+      onPrefChange: this.onPrefChange, search: this.search,
+      proBadgeLabel: s.isPro ? 'PRO' : '無料プラン',
+      proBadgeBg: s.isPro ? '#1FC8A3' : '#EFEAFB', proBadgeColor: s.isPro ? '#fff' : '#5B4EFF',
+      openPaywallFromHome: this.openPaywallFromHome, tabs,
+
+      goHome: this.goHome, routesView,
+
+      backToCompare: this.backToCompare, detailLabel: `${routeMeta.label} ルート詳細`, detail,
+      isPro: s.isPro, isNotPro: !s.isPro, carVisuals, stationsView,
+      openPaywallFromDetail: this.openPaywallFromDetail,
+      startTripOrPaywall: this.startTripOrPaywall,
+      startTripLabel: s.isPro ? 'Live Comfort Coachを開始' : 'Live Comfort Coachを開始（Pro）',
+
+      coachTrain: `${detail.train} ${detail.dest}`,
+      coachCurrentStation: stations[idx].name,
+      coachNextStation: isLastStation ? 'まもなく到着' : `次: ${stations[idx + 1].name}`,
+      coachProgress,
+      coachStandingLabel: `${stations[idx].standing}分`,
+      coachNotice: isLastStation ? 'まもなく目的地に到着します。お忘れ物にご注意ください。' : `次の${stations[idx + 1].name.replace(/（.*?）/g, '')}で着座確率が上昇する見込みです`,
+      coachButtonLabel: isLastStation ? '到着・降車する' : `${stations[idx + 1].name.replace(/（.*?）/g, '')}に到着`,
+      advanceStation: this.advanceStation,
+
+      isFeedbackFormVisible: !s.feedbackSubmitted, isFeedbackSubmitted: s.feedbackSubmitted,
+      choiceView, showStationPicker: s.feedbackChoice === 'partial', stationChoiceView, detailChoiceView,
+      submitFeedback: this.submitFeedback, submitBg: canSubmit ? '#5B4EFF' : '#C9C4E0',
+      openPaywallFromFeedback: this.openPaywallFromFeedback,
+
+      closePaywall: this.closePaywall, showPaywallOffer: !s.justPurchased, justPurchased: s.justPurchased,
+      featureRows: FEATURES.map((label) => ({ label })), planView,
+      purchase: this.purchase, restorePurchase: this.restorePurchase,
+      continueAfterPurchase: this.continueAfterPurchase,
+
+      hasToast: !!s.toast, toast: s.toast,
+      jumpItems,
+    };
+  }
+}
+
+</script>
+</body>
+</html>
