@@ -49,10 +49,15 @@ contract RiskEngine {
     error UnsupportedChain(uint256 chainId);
     error ZeroAddress();
     error InvalidPriceDrop(uint256 dropBps);
+    error UnauthorizedRiskAdmin(address caller);
+    error InvalidRiskConfig();
+
+    event RiskConfigUpdated(uint64 indexed previousVersion, uint64 indexed newVersion);
 
     IReserveLedger public immutable reserveLedger;
     ITestFtsoV2 public immutable priceFeed;
     address public immutable riskAdmin;
+    uint64 public riskConfigVersion;
     RiskConfig private config;
 
     constructor(address riskAdmin_, IReserveLedger reserveLedger_) {
@@ -79,10 +84,29 @@ contract RiskEngine {
             warningHealthBps: 12_000,
             marginCallHealthBps: 10_000
         });
+        riskConfigVersion = 1;
     }
 
     function getRiskConfig() external view returns (RiskConfig memory) {
         return config;
+    }
+
+    function setRiskConfig(RiskConfig calldata nextConfig) external {
+        if (msg.sender != riskAdmin) {
+            revert UnauthorizedRiskAdmin(msg.sender);
+        }
+        if (
+            nextConfig.haircutBps > BASIS_POINTS || nextConfig.advanceRateBps > BASIS_POINTS
+                || nextConfig.priceTtlSeconds == 0 || nextConfig.reserveTtlSeconds == 0
+                || nextConfig.marginCallHealthBps == 0 || nextConfig.warningHealthBps < nextConfig.marginCallHealthBps
+        ) {
+            revert InvalidRiskConfig();
+        }
+
+        uint64 previousVersion = riskConfigVersion;
+        riskConfigVersion = previousVersion + 1;
+        config = nextConfig;
+        emit RiskConfigUpdated(previousVersion, riskConfigVersion);
     }
 
     function getRiskSnapshot(bytes32 accountId, uint256 debtWad) external view returns (RiskSnapshot memory) {

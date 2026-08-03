@@ -36,6 +36,7 @@ contract ReserveFlowCore is AccessControl {
     error AccountAlreadyExists(bytes32 accountId);
     error AccountNotFound(bytes32 accountId);
     error AccountNotPendingApproval(bytes32 accountId);
+    error AccountNotFrozen(bytes32 accountId);
     error AccountNotActive(bytes32 accountId, AccountStatus status);
     error InvalidFdcProof();
     error UnsupportedProofSource(bytes32 sourceId);
@@ -53,6 +54,7 @@ contract ReserveFlowCore is AccessControl {
         bytes32 indexed accountId, address indexed borrower, bytes32 sourceId, bytes32 externalAddressHash
     );
     event ReserveAccountApproved(bytes32 indexed accountId);
+    event ReserveAccountFrozen(bytes32 indexed accountId, bool frozen);
     event ReserveUpdated(
         bytes32 indexed accountId,
         bytes32 indexed proofId,
@@ -127,6 +129,23 @@ contract ReserveFlowCore is AccessControl {
 
         account.status = AccountStatus.ACTIVE;
         emit ReserveAccountApproved(accountId);
+    }
+
+    function setReserveAccountFrozen(bytes32 accountId, bool frozen) external onlyRole(RISK_ADMIN_ROLE) {
+        ReserveAccount storage account = _account(accountId);
+        if (frozen) {
+            if (account.status != AccountStatus.ACTIVE) {
+                revert AccountNotActive(accountId, account.status);
+            }
+            account.status = AccountStatus.FROZEN;
+        } else {
+            if (account.status != AccountStatus.FROZEN) {
+                revert AccountNotFrozen(accountId);
+            }
+            account.status = AccountStatus.ACTIVE;
+        }
+
+        emit ReserveAccountFrozen(accountId, frozen);
     }
 
     function getReserveAccount(bytes32 accountId) external view returns (ReserveAccount memory) {

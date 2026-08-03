@@ -7,6 +7,7 @@ import {ReserveFlowCore} from "../src/ReserveFlowCore.sol";
 
 interface VmReserve {
     function chainId(uint256 newChainId) external;
+    function expectRevert() external;
     function expectRevert(bytes4 revertData) external;
     function expectRevert(bytes calldata revertData) external;
     function prank(address msgSender) external;
@@ -125,6 +126,26 @@ contract ReserveFlowCoreTest {
         ReserveFlowCore.ReserveAccount memory account = core.getReserveAccount(accountId);
         assertEq(account.balanceDrops, 1_000_000);
         assertEq(account.lastExternalLedger, 103);
+    }
+
+    function testOnlyRiskAdminCanFreezeAndUnfreezeAnAccount() public {
+        vm.prank(OTHER_BORROWER);
+        vm.expectRevert();
+        core.setReserveAccountFrozen(accountId, true);
+
+        core.setReserveAccountFrozen(accountId, true);
+        assertEq(uint256(core.getReserveAccount(accountId).status), uint256(ReserveFlowCore.AccountStatus.FROZEN));
+
+        vm.prank(BORROWER);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ReserveFlowCore.AccountNotActive.selector, accountId, ReserveFlowCore.AccountStatus.FROZEN
+            )
+        );
+        core.submitXrpPaymentProof(accountId, incomingProof(bytes32(uint256(8)), 104, 1_000_000));
+
+        core.setReserveAccountFrozen(accountId, false);
+        assertEq(uint256(core.getReserveAccount(accountId).status), uint256(ReserveFlowCore.AccountStatus.ACTIVE));
     }
 
     function incomingProof(bytes32 transactionId, uint64 ledgerIndex, uint256 amount)

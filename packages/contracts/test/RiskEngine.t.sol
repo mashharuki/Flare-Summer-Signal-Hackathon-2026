@@ -9,6 +9,9 @@ import {RiskEngine} from "../src/RiskEngine.sol";
 interface VmRisk {
     function chainId(uint256 newChainId) external;
     function etch(address target, bytes calldata newRuntimeBytecode) external;
+    function expectRevert(bytes4 revertData) external;
+    function expectRevert(bytes calldata revertData) external;
+    function prank(address msgSender) external;
     function warp(uint256 newTimestamp) external;
 }
 
@@ -139,6 +142,26 @@ contract RiskEngineTest {
         RiskEngine.RiskSnapshot memory current = riskEngine.getRiskSnapshot(ACCOUNT_ID, DEBT_WAD);
         assertEq(current.creditLimitWad, 70e18);
         assertEq(uint256(current.status), uint256(RiskEngine.RiskStatus.HEALTHY));
+    }
+
+    function testOnlyRiskAdminCanUpdateRiskConfigurationAndItChangesTheSnapshot() public {
+        RiskEngine.RiskConfig memory updated = RiskEngine.RiskConfig({
+            haircutBps: 4_000,
+            advanceRateBps: 4_000,
+            priceTtlSeconds: 120,
+            reserveTtlSeconds: 1_800,
+            warningHealthBps: 12_000,
+            marginCallHealthBps: 10_000
+        });
+
+        vm.prank(address(0xBAD));
+        vm.expectRevert(abi.encodeWithSelector(RiskEngine.UnauthorizedRiskAdmin.selector, address(0xBAD)));
+        riskEngine.setRiskConfig(updated);
+
+        riskEngine.setRiskConfig(updated);
+        assertEq(riskEngine.riskConfigVersion(), 2);
+        assertEq(riskEngine.getRiskConfig().haircutBps, 4_000);
+        assertEq(riskEngine.getRiskSnapshot(ACCOUNT_ID, DEBT_WAD).creditLimitWad, 48e18);
     }
 
     function assertEq(uint256 actual, uint256 expected) internal pure {
