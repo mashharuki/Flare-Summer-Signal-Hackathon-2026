@@ -6,7 +6,7 @@
   "scripts": {
     "format": "pnpm exec biome format --write .",
     "check": "pnpm exec biome check .",
-    "knip": "pnpm exec knip",
+    "knip": "knip",
     "test": "pnpm --filter @reserveflow/shared test",
     "typecheck": "pnpm --filter @reserveflow/shared typecheck && pnpm --filter @reserveflow/sdk typecheck && pnpm --filter @reserveflow/web typecheck && pnpm --filter @reserveflow/attestation-worker typecheck"
   },
