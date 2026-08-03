@@ -4,11 +4,13 @@ pragma solidity 0.8.30;
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
 import {IFdcVerification} from "./interfaces/IFdcVerification.sol";
+import {IFlareContractRegistry} from "./interfaces/IFlareContractRegistry.sol";
 import {IXRPPayment} from "./interfaces/IXRPPayment.sol";
 
 /// @notice Coston2 reserve ledger updated only by FDC-verified XRPL Testnet payments.
 contract ReserveFlowCore is AccessControl {
     uint256 public constant COSTON2_CHAIN_ID = 114;
+    address public constant FLARE_CONTRACT_REGISTRY = 0xaD67FE66660Fb8dFE9d6b1b4240d8650e30F6019;
     bytes32 public constant RISK_ADMIN_ROLE = keccak256("RISK_ADMIN_ROLE");
     bytes32 public constant TEST_XRP_SOURCE_ID = bytes32("testXRP");
     uint8 public constant XRPL_PAYMENT_SUCCESS = 0;
@@ -72,15 +74,19 @@ contract ReserveFlowCore is AccessControl {
     mapping(bytes32 accountId => bool exists) private accountExists;
     mapping(bytes32 proofId => bool used) public usedProofs;
 
-    constructor(address riskAdmin, IFdcVerification verifier) {
+    constructor(address riskAdmin) {
         if (block.chainid != COSTON2_CHAIN_ID) {
             revert UnsupportedChain(block.chainid);
         }
-        if (riskAdmin == address(0) || address(verifier) == address(0)) {
+        if (riskAdmin == address(0)) {
             revert ZeroAddress();
         }
 
-        fdcVerification = verifier;
+        address verifier = IFlareContractRegistry(FLARE_CONTRACT_REGISTRY).getContractAddressByName("FdcVerification");
+        if (verifier == address(0)) {
+            revert ZeroAddress();
+        }
+        fdcVerification = IFdcVerification(verifier);
         _grantRole(DEFAULT_ADMIN_ROLE, riskAdmin);
         _grantRole(RISK_ADMIN_ROLE, riskAdmin);
     }

@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
+    "deploy:coston2": "forge script script/DeployCoston2.s.sol:DeployCoston2 --rpc-url \"$COSTON2_RPC_URL\" --broadcast",
     "test": "forge test",
     "typecheck": "forge build"
   },

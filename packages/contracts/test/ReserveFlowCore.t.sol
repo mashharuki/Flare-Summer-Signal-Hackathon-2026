@@ -2,11 +2,13 @@
 pragma solidity 0.8.30;
 
 import {IFdcVerification} from "../src/interfaces/IFdcVerification.sol";
+import {IFlareContractRegistry} from "../src/interfaces/IFlareContractRegistry.sol";
 import {IXRPPayment} from "../src/interfaces/IXRPPayment.sol";
 import {ReserveFlowCore} from "../src/ReserveFlowCore.sol";
 
 interface VmReserve {
     function chainId(uint256 newChainId) external;
+    function etch(address target, bytes calldata newRuntimeBytecode) external;
     function expectRevert() external;
     function expectRevert(bytes4 revertData) external;
     function expectRevert(bytes calldata revertData) external;
@@ -25,27 +27,48 @@ contract MockFdcVerification is IFdcVerification {
     }
 }
 
+contract MockContractRegistryReserve is IFlareContractRegistry {
+    IFdcVerification internal immutable verifier;
+
+    constructor(IFdcVerification verifier_) {
+        verifier = verifier_;
+    }
+
+    function getContractAddressByName(string calldata contractName) external view returns (address) {
+        require(keccak256(bytes(contractName)) == keccak256("FdcVerification"), "unexpected contract");
+        return address(verifier);
+    }
+}
+
 contract ReserveFlowCoreTest {
     VmReserve internal constant vm = VmReserve(address(uint160(uint256(keccak256("hevm cheat code")))));
 
     address internal constant BORROWER = address(0xB0B);
     address internal constant OTHER_BORROWER = address(0xCAFE);
+    address internal constant FLARE_CONTRACT_REGISTRY = 0xaD67FE66660Fb8dFE9d6b1b4240d8650e30F6019;
     bytes32 internal constant EXTERNAL_ADDRESS_HASH = keccak256("rReserveFlowTestAddress");
     bytes32 internal constant TEST_XRP = bytes32("testXRP");
 
     MockFdcVerification internal verifier;
+    MockContractRegistryReserve internal contractRegistry;
     ReserveFlowCore internal core;
     bytes32 internal accountId;
 
     function setUp() public {
         vm.chainId(114);
         verifier = new MockFdcVerification();
-        core = new ReserveFlowCore(address(this), verifier);
+        contractRegistry = new MockContractRegistryReserve(verifier);
+        vm.etch(FLARE_CONTRACT_REGISTRY, address(contractRegistry).code);
+        core = new ReserveFlowCore(address(this));
         core.setBorrowerApproval(BORROWER, true);
 
         vm.prank(BORROWER);
         accountId = core.registerReserveAccount(EXTERNAL_ADDRESS_HASH);
         core.approveReserveAccount(accountId);
+    }
+
+    function testResolvesFdcVerificationFromTheCoston2ContractRegistry() public view {
+        assertEq(address(core.fdcVerification()), address(verifier));
     }
 
     function testOnlyApprovedBorrowersCanRegisterTestXrpReserveAccounts() public {

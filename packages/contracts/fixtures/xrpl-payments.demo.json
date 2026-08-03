@@ -1,0 +1,23 @@
+{
+  "network": "XRPL Testnet",
+  "sourceId": "testXRP",
+  "attestationType": "XRPPayment",
+  "proofStatus": "UNVERIFIED_DEMO_INPUTS",
+  "warning": "These inputs are not FDC proofs. The worker must obtain a current Merkle proof and ReserveFlowCore must verify it on-chain before any reserve update.",
+  "payments": [
+    {
+      "name": "reserve-deposit",
+      "direction": "INCOMING",
+      "transactionId": "0x1111111111111111111111111111111111111111111111111111111111111111",
+      "expectedAmountDrops": "1000000",
+      "expectedStatus": "SUCCESS"
+    },
+    {
+      "name": "reserve-withdrawal",
+      "direction": "OUTGOING",
+      "transactionId": "0x2222222222222222222222222222222222222222222222222222222222222222",
+      "expectedAmountDrops": "400000",
+      "expectedStatus": "SUCCESS"
+    }
+  ]
+}

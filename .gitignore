@@ -5,3 +5,4 @@ node_modules/
 packages/contracts/out/
 packages/contracts/cache/
 packages/contracts/lib/
+deployments/*.local.json
