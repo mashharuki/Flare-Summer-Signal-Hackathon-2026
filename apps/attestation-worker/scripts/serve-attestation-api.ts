@@ -9,6 +9,7 @@ import { createSignatureAuthorizer } from "../src/api/signature-authorizer.js";
 import { createCoston2AttestationRuntime } from "../src/fdc/coston2-attestation-runtime.js";
 import { XrpPaymentAttestationCoordinator } from "../src/fdc/xrp-payment-attestation-coordinator.js";
 import { getWorkerRuntimeConfig } from "../src/index.js";
+import { loadWorkerEnvironment } from "../src/worker-env.js";
 
 function requiredValue(name: string): string {
   const value = process.env[name]?.trim();
@@ -31,6 +32,7 @@ function port(): number {
 }
 
 async function main(): Promise<void> {
+  loadWorkerEnvironment();
   const config = getWorkerRuntimeConfig(process.env);
   const runtime = await createCoston2AttestationRuntime({
     coreAddress: requiredAddress("RESERVE_FLOW_CORE_ADDRESS"),
