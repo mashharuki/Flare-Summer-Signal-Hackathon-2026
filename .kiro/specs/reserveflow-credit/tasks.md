@@ -63,7 +63,7 @@
   - Webが送ったFdcHub receiptを検証し、クライアント入力に依存せずround IDを算出して提出状態へ遷移する。
   - _Requirements: 3.1, 3.2, 3.4, 3.5, 9.4_
   - _Depends: 3.1, 2.5_
-- [ ] 3.3 ラウンド確定、DA Layer取得、最終proof提出の連携を実装する
+- [x] 3.3 ラウンド確定、DA Layer取得、最終proof提出の連携を実装する
   - Relay確定を追跡し、確定前・DA障害・期限切れを安全な状態とエラーへ写像する。
   - 取得したproofを不透明な型付きpayloadとしてWebへ返し、借入者ウォレットがReserveFlowCoreへ最終提出できるようにする。
   - Coreの成功または拒否イベントを確認して、Coordinatorの状態と履歴を`VERIFIED`または`FAILED`へ確定する。

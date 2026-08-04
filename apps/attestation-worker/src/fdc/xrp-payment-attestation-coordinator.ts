@@ -1,6 +1,7 @@
 import {
   type AccountId,
   type Address,
+  type AttestationFailure,
   asProofId,
   type ProofId,
   type TransactionHash,
@@ -45,10 +46,37 @@ export interface FdcHubReceiptReader {
   }>;
 }
 
+export interface FdcProofGateway {
+  getXrpPaymentProof(input: {
+    readonly requestBytes: `0x${string}`;
+    readonly votingRoundId: bigint;
+  }): Promise<OpaqueXrpPaymentProof>;
+  isRoundFinalized(votingRoundId: bigint): Promise<boolean>;
+}
+
+export interface OpaqueXrpPaymentProof {
+  /** Untrusted DA payload. Only ReserveFlowCore may verify and interpret it. */
+  readonly encodedProof: `0x${string}`;
+}
+
+export interface ReserveFlowCoreEventReader {
+  getProofSubmissionOutcome(input: {
+    readonly accountId: AccountId;
+    readonly expectedExternalTransactionId: TransactionHash;
+    readonly transactionHash: TransactionHash;
+  }): Promise<
+    | { readonly kind: "PENDING" }
+    | { readonly kind: "VERIFIED" }
+    | { readonly failure: AttestationFailure; readonly kind: "REJECTED" }
+  >;
+}
+
 export interface XrpPaymentAttestationCoordinatorDependencies {
   readonly accountReader: ReserveAccountReader;
+  readonly coreEvents: ReserveFlowCoreEventReader;
   readonly fdcHub: FdcHubReceiptReader;
   readonly now: () => Date;
+  readonly proofGateway: FdcProofGateway;
   readonly requestTtlMilliseconds: number;
   readonly store: SqliteAttestationStore;
   readonly verifier: XrpPaymentVerifier;
@@ -62,6 +90,26 @@ export interface PreparedXrpPaymentAttestation {
   readonly requestBytesHash: ProofId;
   readonly requiredFeeWei: bigint;
   readonly sourceId: "testXRP";
+}
+
+export interface ProofReadyXrpPaymentAttestation {
+  readonly proof: OpaqueXrpPaymentProof;
+  readonly record: PersistedAttestationRecord;
+}
+
+export type AttestationProgressErrorCode =
+  | "DA_UNAVAILABLE"
+  | "EXPIRED"
+  | "NOT_FINALIZED";
+
+export class AttestationProgressError extends Error {
+  public constructor(
+    readonly code: AttestationProgressErrorCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = "AttestationProgressError";
+  }
 }
 
 const COSTON2_CHAIN_ID = 114;
@@ -187,11 +235,111 @@ export class XrpPaymentAttestationCoordinator {
     });
   }
 
+  public async refresh(input: {
+    readonly requestBytesHash: ProofId;
+  }): Promise<ProofReadyXrpPaymentAttestation> {
+    let record = await this.requireRecord(input.requestBytesHash);
+    const metadata = requireRequestMetadata(record);
+    if (metadata.expiresAt <= BigInt(this.dependencies.now().getTime())) {
+      await this.dependencies.store.markExpired(input.requestBytesHash);
+      throw new AttestationProgressError(
+        "EXPIRED",
+        "Attestation request expired before an FDC proof became available.",
+      );
+    }
+
+    if (record.status === "SUBMITTED") {
+      record = await this.dependencies.store.markWaitingForFinalization(
+        input.requestBytesHash,
+      );
+    }
+    if (record.status === "WAITING_FINALIZATION") {
+      const votingRoundId = requireVotingRoundId(record);
+      const finalized =
+        await this.dependencies.proofGateway.isRoundFinalized(votingRoundId);
+      if (!finalized) {
+        throw new AttestationProgressError(
+          "NOT_FINALIZED",
+          `FDC voting round ${votingRoundId} is not finalized yet.`,
+        );
+      }
+      record = await this.dependencies.store.markFetchingProof(
+        input.requestBytesHash,
+      );
+    }
+    if (record.status !== "FETCHING_PROOF" && record.status !== "PROOF_READY") {
+      throw new Error(
+        `Attestation ${input.requestBytesHash} cannot fetch a proof from ${record.status}.`,
+      );
+    }
+
+    let proof: OpaqueXrpPaymentProof;
+    try {
+      proof = await this.dependencies.proofGateway.getXrpPaymentProof({
+        requestBytes: metadata.requestBytes,
+        votingRoundId: requireVotingRoundId(record),
+      });
+    } catch (error) {
+      throw new AttestationProgressError(
+        "DA_UNAVAILABLE",
+        `FDC DA Layer proof retrieval failed: ${errorMessage(error)}`,
+      );
+    }
+    if (record.status === "FETCHING_PROOF") {
+      record = await this.dependencies.store.markProofReady(
+        input.requestBytesHash,
+      );
+    }
+    return { proof, record };
+  }
+
+  public async confirmCoreSubmission(input: {
+    readonly requestBytesHash: ProofId;
+    readonly transactionHash: TransactionHash;
+  }): Promise<PersistedAttestationRecord> {
+    const record = await this.requireRecord(input.requestBytesHash);
+    if (record.status !== "PROOF_READY") {
+      throw new Error(
+        `Attestation ${input.requestBytesHash} is not ready for ReserveFlowCore confirmation.`,
+      );
+    }
+    const outcome =
+      await this.dependencies.coreEvents.getProofSubmissionOutcome({
+        accountId: record.accountId,
+        expectedExternalTransactionId: record.txHash,
+        transactionHash: input.transactionHash,
+      });
+    if (outcome.kind === "PENDING") {
+      return record;
+    }
+    if (outcome.kind === "REJECTED") {
+      return this.dependencies.store.markFailed(
+        input.requestBytesHash,
+        outcome.failure,
+      );
+    }
+    return this.dependencies.store.markVerifiedFromCoreEvent(
+      input.requestBytesHash,
+      { transactionHash: input.transactionHash },
+    );
+  }
+
   private expiresAt(): bigint {
     return BigInt(
       this.dependencies.now().getTime() +
         this.dependencies.requestTtlMilliseconds,
     );
+  }
+
+  private async requireRecord(
+    requestBytesHash: ProofId,
+  ): Promise<PersistedAttestationRecord> {
+    const record =
+      await this.dependencies.store.getByRequestBytesHash(requestBytesHash);
+    if (!record) {
+      throw new Error(`Attestation request ${requestBytesHash} was not found.`);
+    }
+    return record;
   }
 }
 
@@ -240,4 +388,17 @@ function equalAddress(left: Address, right: Address): boolean {
 
 function equalHex(left: `0x${string}`, right: `0x${string}`): boolean {
   return left.toLowerCase() === right.toLowerCase();
+}
+
+function requireVotingRoundId(record: PersistedAttestationRecord): bigint {
+  if (record.votingRoundId === undefined) {
+    throw new Error(
+      "Submitted attestation record is missing its voting round ID.",
+    );
+  }
+  return record.votingRoundId;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Unknown DA Layer failure";
 }

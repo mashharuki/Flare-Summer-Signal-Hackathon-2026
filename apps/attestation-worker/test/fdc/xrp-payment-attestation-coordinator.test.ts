@@ -3,16 +3,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-    asAccountId,
-    asAddress,
-    asProofId,
-    asTransactionHash,
+  asAccountId,
+  asAddress,
+  asProofId,
+  asTransactionHash,
 } from "@reserveflow/shared";
 import { type Hex, keccak256 } from "viem";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-    XrpPaymentAttestationCoordinator,
-    type XrpPaymentAttestationCoordinatorDependencies,
+  XrpPaymentAttestationCoordinator,
+  type XrpPaymentAttestationCoordinatorDependencies,
 } from "../../src/fdc/xrp-payment-attestation-coordinator.js";
 import { createSqliteAttestationStore } from "../../src/persistence/attestation-store.js";
 
@@ -26,6 +26,9 @@ const XRPL_TRANSACTION_ID = asTransactionHash(
 );
 const REQUEST_TRANSACTION_HASH = asTransactionHash(
   "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+);
+const CORE_SUBMISSION_TRANSACTION_HASH = asTransactionHash(
+  "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
 );
 const REQUEST_BYTES = "0x1234" as Hex;
 const REQUEST_BYTES_HASH = asProofId(keccak256(REQUEST_BYTES));
@@ -72,7 +75,18 @@ async function createCoordinator(
         votingEpochDurationSeconds: 30n,
       }),
     },
+    coreEvents: {
+      getProofSubmissionOutcome: vi.fn().mockResolvedValue({
+        kind: "VERIFIED",
+      }),
+    },
     now: () => NOW,
+    proofGateway: {
+      getXrpPaymentProof: vi.fn().mockResolvedValue({
+        encodedProof: "0xdead" as Hex,
+      }),
+      isRoundFinalized: vi.fn().mockResolvedValue(true),
+    },
     requestTtlMilliseconds: 60_000,
     store,
     verifier: {
@@ -233,5 +247,147 @@ describe("XrpPaymentAttestationCoordinator", () => {
     ).resolves.toMatchObject({ status: "READY_TO_SUBMIT" });
     expect(dependencies.fdcHub.getVotingRoundParameters).not.toHaveBeenCalled();
     await store.close();
+  });
+
+  it("keeps an attestation waiting and reports NOT_FINALIZED before Relay finalization", async () => {
+    const { coordinator, dependencies, store } = await createCoordinator({
+      proofGateway: {
+        getXrpPaymentProof: vi.fn(),
+        isRoundFinalized: vi.fn().mockResolvedValue(false),
+      },
+    });
+    await coordinator.prepare({
+      accountId: ACCOUNT_ID,
+      transactionId: XRPL_TRANSACTION_ID,
+    });
+    await coordinator.recordSubmitted({
+      requestBytesHash: REQUEST_BYTES_HASH,
+      requestTransactionHash: REQUEST_TRANSACTION_HASH,
+    });
+
+    await expect(
+      coordinator.refresh({ requestBytesHash: REQUEST_BYTES_HASH }),
+    ).rejects.toMatchObject({ code: "NOT_FINALIZED" });
+    await expect(
+      store.getByRequestBytesHash(REQUEST_BYTES_HASH),
+    ).resolves.toMatchObject({ status: "WAITING_FINALIZATION" });
+    expect(dependencies.proofGateway.getXrpPaymentProof).not.toHaveBeenCalled();
+    await store.close();
+  });
+
+  it("returns the opaque DA proof only after finalization and records PROOF_READY", async () => {
+    const { coordinator, dependencies, store } = await createCoordinator();
+    await coordinator.prepare({
+      accountId: ACCOUNT_ID,
+      transactionId: XRPL_TRANSACTION_ID,
+    });
+    await coordinator.recordSubmitted({
+      requestBytesHash: REQUEST_BYTES_HASH,
+      requestTransactionHash: REQUEST_TRANSACTION_HASH,
+    });
+
+    const proofReady = await coordinator.refresh({
+      requestBytesHash: REQUEST_BYTES_HASH,
+    });
+
+    expect(dependencies.proofGateway.getXrpPaymentProof).toHaveBeenCalledWith({
+      requestBytes: REQUEST_BYTES,
+      votingRoundId: 3n,
+    });
+    expect(proofReady).toMatchObject({
+      proof: { encodedProof: "0xdead" },
+      record: { status: "PROOF_READY" },
+    });
+    await store.close();
+  });
+
+  it("leaves a retryable DA failure in FETCHING_PROOF and expires stale requests", async () => {
+    let currentTime = NOW;
+    const { coordinator, store } = await createCoordinator({
+      now: () => currentTime,
+      proofGateway: {
+        getXrpPaymentProof: vi.fn().mockRejectedValue(new Error("DA offline")),
+        isRoundFinalized: vi.fn().mockResolvedValue(true),
+      },
+    });
+    await coordinator.prepare({
+      accountId: ACCOUNT_ID,
+      transactionId: XRPL_TRANSACTION_ID,
+    });
+    await coordinator.recordSubmitted({
+      requestBytesHash: REQUEST_BYTES_HASH,
+      requestTransactionHash: REQUEST_TRANSACTION_HASH,
+    });
+
+    await expect(
+      coordinator.refresh({ requestBytesHash: REQUEST_BYTES_HASH }),
+    ).rejects.toMatchObject({ code: "DA_UNAVAILABLE" });
+    await expect(
+      store.getByRequestBytesHash(REQUEST_BYTES_HASH),
+    ).resolves.toMatchObject({ status: "FETCHING_PROOF" });
+
+    currentTime = new Date(NOW.getTime() + 60_001);
+    await expect(
+      coordinator.refresh({ requestBytesHash: REQUEST_BYTES_HASH }),
+    ).rejects.toMatchObject({ code: "EXPIRED" });
+    await expect(
+      store.getByRequestBytesHash(REQUEST_BYTES_HASH),
+    ).resolves.toMatchObject({ status: "EXPIRED" });
+    await store.close();
+  });
+
+  it("uses ReserveFlowCore events as the only source of VERIFIED or FAILED", async () => {
+    const { coordinator, store } = await createCoordinator();
+    await coordinator.prepare({
+      accountId: ACCOUNT_ID,
+      transactionId: XRPL_TRANSACTION_ID,
+    });
+    await coordinator.recordSubmitted({
+      requestBytesHash: REQUEST_BYTES_HASH,
+      requestTransactionHash: REQUEST_TRANSACTION_HASH,
+    });
+    await coordinator.refresh({ requestBytesHash: REQUEST_BYTES_HASH });
+
+    const verified = await coordinator.confirmCoreSubmission({
+      requestBytesHash: REQUEST_BYTES_HASH,
+      transactionHash: CORE_SUBMISSION_TRANSACTION_HASH,
+    });
+    expect(verified).toMatchObject({
+      coreEventTransactionHash: CORE_SUBMISSION_TRANSACTION_HASH,
+      status: "VERIFIED",
+    });
+
+    const second = await createCoordinator({
+      coreEvents: {
+        getProofSubmissionOutcome: vi.fn().mockResolvedValue({
+          failure: {
+            code: "INVALID_FDC_PROOF",
+            message: "Proof verification failed.",
+          },
+          kind: "REJECTED",
+        }),
+      },
+    });
+    await second.coordinator.prepare({
+      accountId: ACCOUNT_ID,
+      transactionId: XRPL_TRANSACTION_ID,
+    });
+    await second.coordinator.recordSubmitted({
+      requestBytesHash: REQUEST_BYTES_HASH,
+      requestTransactionHash: REQUEST_TRANSACTION_HASH,
+    });
+    await second.coordinator.refresh({ requestBytesHash: REQUEST_BYTES_HASH });
+
+    await expect(
+      second.coordinator.confirmCoreSubmission({
+        requestBytesHash: REQUEST_BYTES_HASH,
+        transactionHash: CORE_SUBMISSION_TRANSACTION_HASH,
+      }),
+    ).resolves.toMatchObject({
+      failure: { code: "INVALID_FDC_PROOF" },
+      status: "FAILED",
+    });
+    await store.close();
+    await second.store.close();
   });
 });
