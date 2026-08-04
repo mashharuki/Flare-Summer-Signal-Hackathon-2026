@@ -1,4 +1,9 @@
 {
   "extends": "../../tsconfig.base.json",
-  "include": ["src/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "scripts/**/*.ts",
+    "test/xrpl/send-test-payment.test.ts",
+    "test/persistence/attestation-store.test.ts"
+, "test/fdc/xrp-payment-attestation-coordinator.test.ts"  ]
 }

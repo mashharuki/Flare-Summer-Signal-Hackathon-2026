@@ -50,14 +50,14 @@
   - _Depends: 2.1, 2.2, 2.3, 2.4_
 
 - [ ] 3. FDC証明の非同期Coordinatorを実装する
-- [ ] 3.1 証明進行状態の永続化と再開を実装する (P)
+- [x] 3.1 証明進行状態の永続化と再開を実装する (P)
   - request bytes hashを一意キーとして、準備、提出、確定待ち、proof ready、完了、失敗、期限切れを保存する。
   - 再起動後も同一依頼を再開し、同一依頼への複数refreshが別recordを作らないようにする。
   - 金融上の正本をSQLiteへ保存せず、オンチェーンイベントを完了状態の唯一の根拠とする。
   - _Requirements: 3.2, 3.4, 10.4, 10.5_
   - _Boundary: apps/attestation-worker persistence domain_
   - _Depends: 1.1, 1.2_
-- [ ] 3.2 Verifier準備、FDC fee、提出receipt検証を実装する
+- [x] 3.2 Verifier準備、FDC fee、提出receipt検証を実装する
   - 登録済みborrowerからproof ownerを導出し、`testXRP`向けの型付き証明依頼を準備する。
   - 同一request bytesのFDC feeを動的に取得し、Webへrequired C2FLR額、期限、request hashを返す。
   - Webが送ったFdcHub receiptを検証し、クライアント入力に依存せずround IDを算出して提出状態へ遷移する。

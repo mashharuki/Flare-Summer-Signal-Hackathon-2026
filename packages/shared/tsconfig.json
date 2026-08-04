@@ -1,4 +1,8 @@
 {
   "extends": "../../tsconfig.base.json",
-  "include": ["src/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "test/domain.test.ts",
+    "test/runtime-config.test.ts"
+  ]
 }

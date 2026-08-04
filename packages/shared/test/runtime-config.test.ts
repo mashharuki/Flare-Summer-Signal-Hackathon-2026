@@ -5,7 +5,7 @@ import {
   ConfigurationError,
   loadWebRuntimeConfig,
   loadWorkerRuntimeConfig,
-} from "./runtime-config.js";
+} from "../src/runtime-config.js";
 
 describe("runtime configuration", () => {
   it("loads the fixed Coston2/XRPL Testnet MVP scope from valid environment values", () => {
@@ -15,7 +15,7 @@ describe("runtime configuration", () => {
         "https://coston2-api.flare.network/ext/C/rpc",
     });
     const workerConfig = loadWorkerRuntimeConfig({
-      COSTON2_DA_LAYER_URL: "https://coston2-data-availability.flare.network",
+      COSTON2_DA_LAYER_URL: "https://ctn2-data-availability.flare.network",
       COSTON2_RPC_URL: "https://coston2-api.flare.network/ext/C/rpc",
       FDC_VERIFIER_API_KEY_TESTNET: "test-key",
       FDC_VERIFIER_URL_TESTNET: "https://fdc-verifiers-testnet.flare.network",
@@ -30,7 +30,7 @@ describe("runtime configuration", () => {
   it("rejects a missing worker secret without exposing its value", () => {
     expect(() =>
       loadWorkerRuntimeConfig({
-        COSTON2_DA_LAYER_URL: "https://coston2-data-availability.flare.network",
+        COSTON2_DA_LAYER_URL: "https://ctn2-data-availability.flare.network",
         COSTON2_RPC_URL: "https://coston2-api.flare.network/ext/C/rpc",
         FDC_VERIFIER_URL_TESTNET: "https://fdc-verifiers-testnet.flare.network",
       }),

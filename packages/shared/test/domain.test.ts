@@ -11,7 +11,7 @@ import {
   type RiskSnapshot,
   toUserFacingError,
   wadToDropsFloor,
-} from "./domain.js";
+} from "../src/domain.js";
 
 describe("ReserveFlow domain contracts", () => {
   it("converts XRP drops to WAD and back without floating-point arithmetic", () => {

@@ -162,3 +162,30 @@ CoordinatorによるVerifier申請、ラウンド待機、DA Layer取得の自�
 - **`BORROWING_PAUSED` / `STALE_PRICE` / `STALE_RESERVE`**: 新規借入は停止されます。返済は引き続き可能です。
 - **`InvalidFdcProof`**: demo fixtureや未確定の応答を使っている可能性があります。DA Layerから取得した最新のproofを使い、オンチェーン検証を通してください。
 - **Vault残高不足**: 借入は原子的に失敗します。rfUSDを追加発行しないでください。MVPでは初期供給後にmint権限を撤回します。
+
+## それ以降
+
+- XRPL testnetのアカウントを作成
+
+```bash
+cast wallet address --private-key "$BORROWER_PRIVATE_KEY"
+
+CORE=0x76E44862C78b13Ae4E36759aC30965923cdAF87C
+HASH=0x23cd51d0ffda904dd4d7a6a93aa286138308a4b6ca30626c73dca8b839671669
+
+cast send "$CORE" "registerReserveAccount(bytes32)" "$HASH" \
+  --private-key "$BORROWER_PRIVATE_KEY" \
+  --rpc-url "$COSTON2_RPC_URL"
+
+CORE=0x76E44862C78b13Ae4E36759aC30965923cdAF87C
+ACCOUNT_ID=0x0069c37c0dc5c651b4f47b311bc44cf9fe9dd2d0d673c8f146b9bdf6ac19395a
+
+cast send "$CORE" "approveReserveAccount(bytes32)" "$ACCOUNT_ID" \
+  --private-key "$DEPLOYER_PRIVATE_KEY" \
+  --rpc-url "$COSTON2_RPC_URL"
+
+cast call "$CORE" \
+  "getReserveAccount(bytes32)((address,bytes32,bytes32,uint256,uint64,uint64,uint8))" \
+  "$ACCOUNT_ID" \
+  --rpc-url "$COSTON2_RPC_URL"
+```

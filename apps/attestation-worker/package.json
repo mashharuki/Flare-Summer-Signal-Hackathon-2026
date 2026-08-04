@@ -4,10 +4,19 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "request:xrp-payment-proof": "tsx scripts/request-xrp-payment-proof.ts",
+    "send:xrpl-test-payment": "tsx scripts/send-xrpl-test-payment.ts",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@reserveflow/shared": "workspace:*"
+    "@reserveflow/shared": "workspace:*",
+    "sql.js": "^1.14.1",
+    "viem": "2.41.2",
+    "xrpl": "5.0.0"
+  },
+  "devDependencies": {
+    "@types/sql.js": "^1.4.11",
+    "tsx": "4.21.0"
   }
 }
