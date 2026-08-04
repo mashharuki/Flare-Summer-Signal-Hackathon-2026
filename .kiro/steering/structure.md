@@ -40,3 +40,24 @@ No application module system or path aliases are configured yet. When source is 
 
 ---
 _Document reusable organization rules, not a file inventory. New code that follows these domain boundaries should not require a steering update._
+
+## Current Executable Workspace (Implemented)
+
+The repository is now a pnpm monorepo. Keep responsibilities separated by runtime and domain boundary:
+
+- `apps/web` is the Next.js presentation layer. Keep wallet guards, display projections, i18n, and input previews here; do not duplicate on-chain risk formulas in page components.
+- `apps/attestation-worker` owns FDC request preparation, finalization polling, DA Layer retrieval, and resumable proof-progress storage. It is a CLI worker today, not an HTTP API.
+- `packages/contracts` owns authoritative reserve, risk, debt, and test-rfUSD state. Organize Solidity by reserve, risk, credit, and token domains; tests live beside the contract suite and include fuzz/invariant coverage.
+- `packages/shared` owns branded monetary and identifier types, DTOs, errors, and safe runtime configuration. Apps may depend on it; it must not depend on apps or contracts.
+- `packages/sdk` is the typed client-facing export boundary and may depend only on shared contracts.
+
+## Import and Test Conventions
+
+- TypeScript workspaces are ESM. Use explicit `.js` suffixes for local TypeScript imports and avoid `any` across runtime boundaries.
+- Keep pure UI projections in `apps/web/src` and cover them with colocated domain-named Vitest files under `apps/web/test`.
+- Keep external FDC/HTTP/XRPL adapters in the worker, and use fixtures for tests rather than real network calls.
+- Keep deployment scripts and Foundry tests within the contracts package; never make UI or worker code authoritative over reserve, risk, or debt state.
+
+## Security Boundary Reminder
+
+The intended worker boundary is non-custodial: proof acceptance is decided only by `ReserveFlowCore` after FDC verification. The current controlled demo script signs Coston2 transactions from an environment-provided borrower key; treat that as a local test operation, never as a pattern for a public Worker API or a Vercel deployment.

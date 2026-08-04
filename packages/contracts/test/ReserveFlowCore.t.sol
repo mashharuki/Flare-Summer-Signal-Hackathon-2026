@@ -151,6 +151,25 @@ contract ReserveFlowCoreTest {
         assertEq(account.lastExternalLedger, 103);
     }
 
+    function testReverseLedgersAndOverdrawsLeaveTheLedgerAndProofStateUnchanged() public {
+        vm.prank(BORROWER);
+        core.submitXrpPaymentProof(accountId, incomingProof(bytes32(uint256(10)), 200, 1_000_000));
+
+        vm.prank(BORROWER);
+        vm.expectRevert(abi.encodeWithSelector(ReserveFlowCore.OutOfOrderLedger.selector, 200, 199));
+        core.submitXrpPaymentProof(accountId, incomingProof(bytes32(uint256(11)), 199, 1_000_000));
+
+        bytes32 withdrawalTransactionId = bytes32(uint256(12));
+        vm.prank(BORROWER);
+        vm.expectRevert(abi.encodeWithSelector(ReserveFlowCore.InsufficientReserveBalance.selector, 1_000_000, 1_000_001));
+        core.submitXrpPaymentProof(accountId, outgoingProof(withdrawalTransactionId, 201, 1_000_001));
+
+        ReserveFlowCore.ReserveAccount memory account = core.getReserveAccount(accountId);
+        assertEq(account.balanceDrops, 1_000_000);
+        assertEq(account.lastExternalLedger, 200);
+        assertFalse(core.usedProofs(keccak256(abi.encode(TEST_XRP, withdrawalTransactionId))));
+    }
+
     function testOnlyRiskAdminCanFreezeAndUnfreezeAnAccount() public {
         vm.prank(OTHER_BORROWER);
         vm.expectRevert();
@@ -256,5 +275,9 @@ contract ReserveFlowCoreTest {
 
     function assertEq(uint256 actual, uint256 expected) internal pure {
         require(actual == expected, "assertion failed: uints differ");
+    }
+
+    function assertFalse(bool condition) internal pure {
+        require(!condition, "assertion failed: condition is true");
     }
 }

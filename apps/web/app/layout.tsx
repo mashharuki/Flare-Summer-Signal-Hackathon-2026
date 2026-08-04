@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
-import "./globals.css";
+import "./css/globals.css";
 
 export const metadata: Metadata = {
   description: "Coston2 Testnet-only reserve attestation workspace.",

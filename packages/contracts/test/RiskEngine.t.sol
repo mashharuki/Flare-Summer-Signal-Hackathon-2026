@@ -144,6 +144,30 @@ contract RiskEngineTest {
         assertEq(uint256(current.status), uint256(RiskEngine.RiskStatus.HEALTHY));
     }
 
+    function testFloorsIntermediateValuesToKeepTheCreditLimitConservative() public {
+        reserveLedger.setAccount(1, uint64(block.timestamp), IReserveLedger.AccountStatus.ACTIVE);
+        priceFeed.setPrice(1e18 + 1, uint64(block.timestamp));
+
+        RiskEngine.RiskSnapshot memory snapshot = riskEngine.getRiskSnapshot(ACCOUNT_ID, 0);
+
+        assertEq(snapshot.grossReserveUsdWad, 1e12);
+        assertEq(snapshot.adjustedReserveUsdWad, 700_000_000_000);
+        assertEq(snapshot.creditLimitWad, 350_000_000_000);
+    }
+
+    function testFuzzCreditLimitNeverExceedsTheHaircutAndAdvanceRate(uint96 balanceDrops, uint96 priceWad) public {
+        uint256 boundedBalanceDrops = uint256(balanceDrops) % 1e18;
+        uint256 boundedPriceWad = (uint256(priceWad) % 1_000e18) + 1;
+        reserveLedger.setAccount(boundedBalanceDrops, uint64(block.timestamp), IReserveLedger.AccountStatus.ACTIVE);
+        priceFeed.setPrice(boundedPriceWad, uint64(block.timestamp));
+
+        RiskEngine.RiskSnapshot memory snapshot = riskEngine.getRiskSnapshot(ACCOUNT_ID, 0);
+
+        assertTrue(snapshot.adjustedReserveUsdWad <= snapshot.grossReserveUsdWad);
+        assertTrue(snapshot.creditLimitWad <= snapshot.adjustedReserveUsdWad);
+        assertEq(snapshot.creditLimitWad, snapshot.grossReserveUsdWad * 35 / 100);
+    }
+
     function testOnlyRiskAdminCanUpdateRiskConfigurationAndItChangesTheSnapshot() public {
         RiskEngine.RiskConfig memory updated = RiskEngine.RiskConfig({
             haircutBps: 4_000,

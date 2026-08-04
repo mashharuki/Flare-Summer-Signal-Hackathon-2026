@@ -1,9 +1,11 @@
 node_modules/
 .next/
 .playwright-cli/
+.vercel/
 .env
 .env.*
 !.env.example
+!apps/web/.env.local.example
 packages/contracts/out/
 packages/contracts/cache/
 packages/contracts/lib/

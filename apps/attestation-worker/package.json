@@ -6,6 +6,8 @@
   "scripts": {
     "request:xrp-payment-proof": "tsx scripts/request-xrp-payment-proof.ts",
     "send:xrpl-test-payment": "tsx scripts/send-xrpl-test-payment.ts",
+    "serve:attestations": "tsx scripts/serve-attestation-api.ts",
+    "smoke:coston2-fdc": "tsx scripts/smoke-coston2-fdc.ts",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },

@@ -13,6 +13,7 @@ import {
   type RiskSnapshot,
 } from "@reserveflow/shared";
 import { useEffect, useMemo, useState } from "react";
+import { keccak256, stringToHex, type Address as ViemAddress } from "viem";
 import { isValidClassicAddress } from "xrpl";
 import {
   buildActivityFeed,
@@ -24,7 +25,16 @@ import {
   type Eip1193Provider,
   type WalletConnection,
 } from "../src/app-shell.js";
+import {
+  AttestationApiError,
+  createAttestationApiClient,
+} from "../src/attestation-api-client.js";
+import { createAttestationFlow } from "../src/attestation-flow.js";
 import { validateXrplTestnetAddress } from "../src/attestation-timeline.js";
+import {
+  createCoston2BrowserWallet,
+  deriveTestXrpAccountId,
+} from "../src/coston2-wallet.js";
 import {
   buildBorrowPreview,
   buildCreditDashboard,
@@ -44,6 +54,40 @@ declare global {
 }
 
 const TIMELINE_NUMBERS = ["01", "02", "03", "04", "05"] as const;
+
+interface LiveContractsConfig {
+  readonly attestationWorkerUrl: string;
+  readonly creditVaultAddress: ViemAddress;
+  readonly fdcHubAddress: ViemAddress;
+  readonly reserveFlowCoreAddress: ViemAddress;
+  readonly rfUsdAddress: ViemAddress;
+}
+
+function liveContractsConfig(): LiveContractsConfig | undefined {
+  const workerUrl = process.env.NEXT_PUBLIC_ATTESTATION_WORKER_URL;
+  const core = process.env.NEXT_PUBLIC_RESERVE_FLOW_CORE_ADDRESS;
+  const fdcHub = process.env.NEXT_PUBLIC_FDC_HUB_ADDRESS;
+  const creditVault = process.env.NEXT_PUBLIC_CREDIT_VAULT_ADDRESS;
+  const rfUsd = process.env.NEXT_PUBLIC_RFUSD_ADDRESS;
+  if (!workerUrl || !core || !fdcHub || !creditVault || !rfUsd) {
+    return undefined;
+  }
+  try {
+    const addresses = [core, fdcHub, creditVault, rfUsd];
+    if (addresses.some((address) => /^0x0{40}$/i.test(address))) {
+      return undefined;
+    }
+    return {
+      attestationWorkerUrl: new URL(workerUrl).origin,
+      creditVaultAddress: asAddress(creditVault) as unknown as ViemAddress,
+      fdcHubAddress: asAddress(fdcHub) as unknown as ViemAddress,
+      reserveFlowCoreAddress: asAddress(core) as unknown as ViemAddress,
+      rfUsdAddress: asAddress(rfUsd) as unknown as ViemAddress,
+    };
+  } catch {
+    return undefined;
+  }
+}
 
 const DEMO_POSITION: CreditPosition = {
   borrower: asAddress("0x1111111111111111111111111111111111111111"),
@@ -101,10 +145,19 @@ export default function ReserveFlowPage() {
   const [priceDrop, setPriceDrop] = useState("25");
   const [showBorrowPreview, setShowBorrowPreview] = useState(false);
   const [showRepaymentPreview, setShowRepaymentPreview] = useState(false);
+  const [attestationMessage, setAttestationMessage] = useState("");
+  const [activeAttestation, setActiveAttestation] = useState<
+    | {
+        readonly accountId: ReturnType<typeof asAccountId>;
+        readonly requestBytesHash: ReturnType<typeof asProofId>;
+      }
+    | undefined
+  >();
+  const [transactionMessage, setTransactionMessage] = useState("");
   const copy = getCopy(locale);
+  const contractsConfig = useMemo(liveContractsConfig, []);
   const configured = Boolean(
-    process.env.NEXT_PUBLIC_ATTESTATION_WORKER_URL &&
-      process.env.NEXT_PUBLIC_COSTON2_RPC_URL,
+    contractsConfig && process.env.NEXT_PUBLIC_COSTON2_RPC_URL,
   );
   const shell = useMemo(
     () => createAppShellView({ configured, connection }),
@@ -208,6 +261,187 @@ export default function ReserveFlowPage() {
   };
 
   const transactionValid = /^0x?[0-9a-fA-F]{64}$/.test(transactionId);
+
+  const createLiveWallets = () => {
+    if (
+      !window.ethereum ||
+      !contractsConfig ||
+      connection.status !== "CONNECTED"
+    ) {
+      throw new Error(
+        "Connect a Coston2 wallet and configure the live contracts first.",
+      );
+    }
+    return createCoston2BrowserWallet({
+      account: connection.account as unknown as ViemAddress,
+      creditVaultAddress: contractsConfig.creditVaultAddress,
+      fdcHubAddress: contractsConfig.fdcHubAddress,
+      provider: window.ethereum,
+      reserveFlowCoreAddress: contractsConfig.reserveFlowCoreAddress,
+      rfUsdAddress: contractsConfig.rfUsdAddress,
+    });
+  };
+
+  const startAttestation = async () => {
+    try {
+      validateXrplTestnetAddress(xrplAddress, isValidClassicAddress);
+      if (
+        !transactionValid ||
+        connection.status !== "CONNECTED" ||
+        !contractsConfig
+      ) {
+        throw new Error(
+          "Connect your wallet and enter a valid XRPL transaction ID first.",
+        );
+      }
+      const accountId = deriveTestXrpAccountId({
+        borrower: connection.account as unknown as ViemAddress,
+        xrplClassicAddress: xrplAddress,
+      });
+      const wallets = createLiveWallets();
+      const api = createAttestationApiClient({
+        accountId,
+        address: connection.account,
+        baseUrl: contractsConfig.attestationWorkerUrl,
+        signMessage: wallets.signMessage,
+      });
+      const flow = createAttestationFlow({
+        api,
+        wallet: wallets.attestationWallet,
+      });
+      const transactionHash = asTransactionHash(
+        transactionId.startsWith("0x") ? transactionId : `0x${transactionId}`,
+      );
+      const started = await flow.start({
+        accountId,
+        borrower: connection.account,
+        transactionId: transactionHash,
+      });
+      setActiveAttestation({
+        accountId,
+        requestBytesHash: started.requestBytesHash,
+      });
+      setAttestationMessage(
+        locale === "ja"
+          ? "FdcHub申請を接続ウォレットから送信しました。ラウンド確定後に証明を取得してください。"
+          : "The connected wallet sent the FdcHub request. Fetch the proof after round finalization.",
+      );
+    } catch (error) {
+      setAttestationMessage(
+        error instanceof Error ? error.message : "Unable to start attestation.",
+      );
+    }
+  };
+
+  const refreshAttestation = async () => {
+    if (
+      !activeAttestation ||
+      connection.status !== "CONNECTED" ||
+      !contractsConfig
+    ) {
+      return;
+    }
+    try {
+      const wallets = createLiveWallets();
+      const api = createAttestationApiClient({
+        accountId: activeAttestation.accountId,
+        address: connection.account,
+        baseUrl: contractsConfig.attestationWorkerUrl,
+        signMessage: wallets.signMessage,
+      });
+      const result = await createAttestationFlow({
+        api,
+        wallet: wallets.attestationWallet,
+      }).refreshAndSubmit(activeAttestation);
+      setAttestationMessage(
+        result.status === "VERIFIED"
+          ? locale === "ja"
+            ? "ReserveFlowCoreで準備金証明を検証しました。"
+            : "ReserveFlowCore verified the reserve proof."
+          : `${locale === "ja" ? "FDC進行状況" : "FDC status"}: ${result.status}`,
+      );
+    } catch (error) {
+      setAttestationMessage(
+        error instanceof AttestationApiError && error.code === "NOT_FINALIZED"
+          ? locale === "ja"
+            ? "FDCラウンドの確定待ちです。しばらくしてから再確認してください。"
+            : "FDC round is not finalized yet. Check again shortly."
+          : error instanceof Error
+            ? error.message
+            : "Unable to refresh attestation.",
+      );
+    }
+  };
+
+  const executeBorrow = async () => {
+    if (!borrowWad) return;
+    try {
+      const wallet = createLiveWallets().creditWallet;
+      if (!wallet) throw new Error("Credit contracts are not configured.");
+      const hash = await wallet.borrow({ amountWad: borrowWad });
+      setTransactionMessage(`Borrow transaction submitted: ${hash}`);
+    } catch (error) {
+      setTransactionMessage(
+        error instanceof Error ? error.message : "Borrow failed.",
+      );
+    }
+  };
+
+  const registerReserveAccount = async () => {
+    try {
+      validateXrplTestnetAddress(xrplAddress, isValidClassicAddress);
+      const wallet = createLiveWallets().creditWallet;
+      if (!wallet) throw new Error("Credit contracts are not configured.");
+      const hash = await wallet.registerReserveAccount({
+        externalAddressHash: keccak256(stringToHex(xrplAddress)),
+      });
+      setTransactionMessage(`Reserve account registration submitted: ${hash}`);
+    } catch (error) {
+      setTransactionMessage(
+        error instanceof Error ? error.message : "Reserve registration failed.",
+      );
+    }
+  };
+
+  const openCreditLine = async () => {
+    try {
+      validateXrplTestnetAddress(xrplAddress, isValidClassicAddress);
+      if (connection.status !== "CONNECTED") {
+        throw new Error("Connect a Coston2 wallet first.");
+      }
+      const wallet = createLiveWallets().creditWallet;
+      if (!wallet) throw new Error("Credit contracts are not configured.");
+      const hash = await wallet.openCreditLine({
+        accountId: deriveTestXrpAccountId({
+          borrower: connection.account as unknown as ViemAddress,
+          xrplClassicAddress: xrplAddress,
+        }),
+      });
+      setTransactionMessage(`Credit line opening submitted: ${hash}`);
+    } catch (error) {
+      setTransactionMessage(
+        error instanceof Error ? error.message : "Credit line opening failed.",
+      );
+    }
+  };
+
+  const executeRepay = async () => {
+    if (!repaymentWad || !contractsConfig) return;
+    try {
+      const wallet = createLiveWallets().creditWallet;
+      if (!wallet) throw new Error("Credit contracts are not configured.");
+      await wallet.approveRfUsd({
+        amountWad: repaymentWad,
+        vaultAddress: contractsConfig.creditVaultAddress,
+      });
+      const hash = await wallet.repay({ amountWad: repaymentWad });
+      setTransactionMessage(`Repay transaction submitted: ${hash}`);
+    } catch (error) {
+      setTransactionMessage(
+        error instanceof Error ? error.message : "Repayment failed.",
+      );
+    }
+  };
 
   return (
     <main className="workbench">
@@ -317,6 +551,64 @@ export default function ReserveFlowPage() {
               {transactionId && !transactionValid
                 ? copy.invalidTransactionId
                 : copy.verifierNotice}
+            </p>
+            <div className="input-row">
+              <button
+                className="action-button secondary"
+                disabled={
+                  !configured ||
+                  connection.status !== "CONNECTED" ||
+                  !isValidClassicAddress(xrplAddress)
+                }
+                onClick={registerReserveAccount}
+                type="button"
+              >
+                {locale === "ja"
+                  ? "準備金アカウントを登録"
+                  : "Register reserve account"}
+              </button>
+              <button
+                className="action-button secondary"
+                disabled={
+                  !configured ||
+                  connection.status !== "CONNECTED" ||
+                  !isValidClassicAddress(xrplAddress)
+                }
+                onClick={openCreditLine}
+                type="button"
+              >
+                {locale === "ja" ? "信用枠を開設" : "Open credit line"}
+              </button>
+            </div>
+            <div className="input-row">
+              <button
+                className="action-button"
+                disabled={
+                  !configured ||
+                  connection.status !== "CONNECTED" ||
+                  !transactionValid ||
+                  !isValidClassicAddress(xrplAddress)
+                }
+                onClick={startAttestation}
+                type="button"
+              >
+                {locale === "ja"
+                  ? "ウォレットでFDC申請"
+                  : "Request FDC with wallet"}
+              </button>
+              <button
+                className="action-button secondary"
+                disabled={!activeAttestation}
+                onClick={refreshAttestation}
+                type="button"
+              >
+                {locale === "ja"
+                  ? "証明を確認・Coreへ提出"
+                  : "Fetch proof and submit to Core"}
+              </button>
+            </div>
+            <p className="field-note" aria-live="polite">
+              {attestationMessage}
             </p>
           </section>
 
@@ -455,6 +747,20 @@ export default function ReserveFlowPage() {
                 tone={borrowPreview.allowed ? "ready" : "blocked"}
               />
             ) : null}
+            <button
+              className="action-button"
+              disabled={
+                !borrowPreview?.allowed ||
+                !configured ||
+                connection.status !== "CONNECTED"
+              }
+              onClick={executeBorrow}
+              type="button"
+            >
+              {locale === "ja"
+                ? "ウォレットで借入を実行"
+                : "Borrow with wallet"}
+            </button>
           </section>
 
           <section className="panel" aria-labelledby="repay-title">
@@ -499,8 +805,23 @@ export default function ReserveFlowPage() {
                 }
               />
             ) : null}
+            <button
+              className="action-button secondary"
+              disabled={
+                !repaymentWad ||
+                !configured ||
+                connection.status !== "CONNECTED"
+              }
+              onClick={executeRepay}
+              type="button"
+            >
+              {locale === "ja" ? "承認して返済を実行" : "Approve and repay"}
+            </button>
           </section>
         </div>
+        <p className="connection-state" aria-live="polite">
+          {transactionMessage}
+        </p>
 
         <section className="activity-monitor" aria-labelledby="activity-title">
           <div className="section-heading">

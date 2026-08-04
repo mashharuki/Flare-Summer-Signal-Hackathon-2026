@@ -301,6 +301,42 @@ describe("XrpPaymentAttestationCoordinator", () => {
     await store.close();
   });
 
+  it("resumes a submitted request after a worker restart without another verifier request or FdcHub fee", async () => {
+    const first = await createCoordinator();
+    await first.coordinator.prepare({
+      accountId: ACCOUNT_ID,
+      transactionId: XRPL_TRANSACTION_ID,
+    });
+    await first.coordinator.recordSubmitted({
+      requestBytesHash: REQUEST_BYTES_HASH,
+      requestTransactionHash: REQUEST_TRANSACTION_HASH,
+    });
+    const databasePath = first.store.databasePath;
+    await first.store.close();
+
+    const resumedStore = await createSqliteAttestationStore({ databasePath });
+    const resumedDependencies = {
+      ...first.dependencies,
+      store: resumedStore,
+    };
+    const resumed = new XrpPaymentAttestationCoordinator(resumedDependencies);
+
+    await expect(
+      resumed.refresh({ requestBytesHash: REQUEST_BYTES_HASH }),
+    ).resolves.toMatchObject({ record: { status: "PROOF_READY" } });
+    expect(
+      resumedDependencies.verifier.prepareXrpPayment,
+    ).toHaveBeenCalledOnce();
+    expect(resumedDependencies.fdcHub.getRequestFee).toHaveBeenCalledOnce();
+    expect(
+      resumedDependencies.proofGateway.getXrpPaymentProof,
+    ).toHaveBeenCalledWith({
+      requestBytes: REQUEST_BYTES,
+      votingRoundId: 3n,
+    });
+    await resumedStore.close();
+  });
+
   it("leaves a retryable DA failure in FETCHING_PROOF and expires stale requests", async () => {
     let currentTime = NOW;
     const { coordinator, store } = await createCoordinator({

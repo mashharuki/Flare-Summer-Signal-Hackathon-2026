@@ -153,7 +153,7 @@ cast call "$TOKEN" "balanceOf(address)(uint256)" "$VAULT" --rpc-url "$COSTON2_RP
 4. 借入者がproofを`submitXrpPaymentProof`へ提出する。
 5. 準備金・価格がfreshで`HEALTHY`になったことを読み取り、借入を実行する。
 
-CoordinatorによるVerifier申請、ラウンド待機、DA Layer取得の自動化はタスク3で実装予定です。現時点ではローカルfixtureとFoundryテストで契約境界を確認し、実ネットワークではFDC公式フローに従って型付きproofを準備してください。
+CoordinatorはVerifier申請、投票ラウンド確認、DA Layerからのproof取得だけを行います。`FdcHub.requestAttestation`と`ReserveFlowCore.submitXrpPaymentProof`は借入者の接続ウォレットが送信します。環境変数と再開方法は[XRPL payment proof申請ガイド](xrp-payment-proof-request.md)に従ってください。ローカルfixtureは契約テスト専用であり、実ネットワークへ提出してはいけません。
 
 ## トラブルシューティング
 
@@ -163,29 +163,6 @@ CoordinatorによるVerifier申請、ラウンド待機、DA Layer取得の自�
 - **`InvalidFdcProof`**: demo fixtureや未確定の応答を使っている可能性があります。DA Layerから取得した最新のproofを使い、オンチェーン検証を通してください。
 - **Vault残高不足**: 借入は原子的に失敗します。rfUSDを追加発行しないでください。MVPでは初期供給後にmint権限を撤回します。
 
-## それ以降
+## 準備金アカウントの登録・承認
 
-- XRPL testnetのアカウントを作成
-
-```bash
-cast wallet address --private-key "$BORROWER_PRIVATE_KEY"
-
-CORE=0x76E44862C78b13Ae4E36759aC30965923cdAF87C
-HASH=0x23cd51d0ffda904dd4d7a6a93aa286138308a4b6ca30626c73dca8b839671669
-
-cast send "$CORE" "registerReserveAccount(bytes32)" "$HASH" \
-  --private-key "$BORROWER_PRIVATE_KEY" \
-  --rpc-url "$COSTON2_RPC_URL"
-
-CORE=0x76E44862C78b13Ae4E36759aC30965923cdAF87C
-ACCOUNT_ID=0x0069c37c0dc5c651b4f47b311bc44cf9fe9dd2d0d673c8f146b9bdf6ac19395a
-
-cast send "$CORE" "approveReserveAccount(bytes32)" "$ACCOUNT_ID" \
-  --private-key "$DEPLOYER_PRIVATE_KEY" \
-  --rpc-url "$COSTON2_RPC_URL"
-
-cast call "$CORE" \
-  "getReserveAccount(bytes32)((address,bytes32,bytes32,uint256,uint64,uint64,uint8))" \
-  "$ACCOUNT_ID" \
-  --rpc-url "$COSTON2_RPC_URL"
-```
+XRPL Testnetアカウントごとに、デプロイ出力から取得した`ReserveFlowCore`で準備金アカウントを登録し、Risk Adminが承認します。過去のデプロイで使ったCoreアドレス、外部アドレスhash、account IDをコピーして使用してはいけません。借入者・XRPLアドレス・今回のデプロイ出力から導出した値だけを使い、登録と承認の確認後にFDC proofフローへ進んでください。

@@ -176,6 +176,16 @@ export class XrpPaymentAttestationCoordinator {
     return preparedFromRecord(record);
   }
 
+  /**
+   * Returns progress metadata only. The HTTP boundary authorizes the borrower
+   * before exposing this record; no proof is returned from this method.
+   */
+  public async get(input: {
+    readonly requestBytesHash: ProofId;
+  }): Promise<PersistedAttestationRecord> {
+    return this.requireRecord(input.requestBytesHash);
+  }
+
   public async recordSubmitted(input: {
     readonly requestBytesHash: ProofId;
     readonly requestTransactionHash: TransactionHash;

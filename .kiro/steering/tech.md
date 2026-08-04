@@ -55,3 +55,19 @@ No package manifest or project commands exist yet. Add commands together with th
 
 ---
 _Document stable engineering standards and system boundaries, not proposed dependencies or implementation wish lists._
+
+## Current Implementation Baseline
+
+The executable workspace uses pnpm 10.33.0 and strict TypeScript. The frontend is Next.js 16 with React 19; the worker uses Node.js TypeScript, viem, xrpl, and sql.js; contracts use Solidity 0.8.30, Foundry, Cancun EVM, and OpenZeppelin 5.6.
+
+Use Coston2 (chain ID 114) and XRPL Testnet only. Resolve FDC, FTSO, and other Flare protocol contracts through the Coston2 Contract Registry; do not place protocol addresses in app configuration. Monetary values remain `bigint` through domain logic, with branded types for drops, WAD, BPS, addresses, account IDs, and proof IDs.
+
+## Runtime and Delivery Decisions
+
+- The FDC coordinator persists only resumable progress in SQLite. Financial state remains on-chain, and DA Layer output is untrusted until `FdcVerification` succeeds.
+- FDC request, proof retrieval, and Coston2 smoke checks are explicit CLI commands. The worker has no public HTTP server or permanent service process yet.
+- The web app may be deployed to Vercel from `apps/web`; browser-visible configuration is limited to `NEXT_PUBLIC_*` values. Verifier API keys, XRPL seeds, and private keys never belong in browser or Vercel frontend configuration.
+
+## Validation Baseline
+
+Run focused tests first, then the workspace checks: shared, worker, and web Vitest suites; Foundry contract tests including fuzz/invariant coverage; `pnpm typecheck`; `pnpm check`; and the Next.js production build. Foundry may need system proxy discovery disabled in this desktop environment; that workaround does not change test semantics.

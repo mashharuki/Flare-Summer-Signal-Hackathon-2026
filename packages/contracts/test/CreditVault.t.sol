@@ -150,6 +150,55 @@ contract CreditVaultTest {
         assertEq(token.balanceOf(BORROWER), 20e18);
     }
 
+    function testRejectsAllNonHealthyBorrowStatesWithoutMovingFunds() public {
+        vm.prank(BORROWER);
+        vault.openCreditLine(ACCOUNT_ID);
+
+        IRiskEngine.RiskStatus[5] memory blockedStatuses = [
+            IRiskEngine.RiskStatus.WARNING,
+            IRiskEngine.RiskStatus.MARGIN_CALL,
+            IRiskEngine.RiskStatus.PRICE_STALE,
+            IRiskEngine.RiskStatus.RESERVE_STALE,
+            IRiskEngine.RiskStatus.FROZEN
+        ];
+
+        for (uint256 index; index < blockedStatuses.length; index++) {
+            IRiskEngine.RiskStatus status = blockedStatuses[index];
+            riskEngine.setSnapshot(70e18, 70e18, status);
+
+            vm.prank(BORROWER);
+            if (status == IRiskEngine.RiskStatus.PRICE_STALE) {
+                vm.expectRevert(CreditVault.StalePrice.selector);
+            } else if (status == IRiskEngine.RiskStatus.RESERVE_STALE) {
+                vm.expectRevert(CreditVault.StaleReserve.selector);
+            } else if (status == IRiskEngine.RiskStatus.FROZEN) {
+                vm.expectRevert(CreditVault.AccountFrozen.selector);
+            } else {
+                vm.expectRevert(abi.encodeWithSelector(CreditVault.CreditNotHealthy.selector, status));
+            }
+            vault.borrow(1e18);
+
+            assertEq(vault.getPosition(BORROWER).principalWad, 0);
+            assertEq(token.balanceOf(BORROWER), 0);
+        }
+    }
+
+    function testFuzzRepaymentCannotReducePrincipalByMoreThanTheTransferredAmount(uint96 amountSeed) public {
+        vm.prank(BORROWER);
+        vault.openCreditLine(ACCOUNT_ID);
+        vm.prank(BORROWER);
+        vault.borrow(20e18);
+
+        uint256 repaymentWad = (uint256(amountSeed) % 20e18) + 1;
+        vm.prank(BORROWER);
+        token.approve(address(vault), repaymentWad);
+        vm.prank(BORROWER);
+        vault.repay(repaymentWad);
+
+        assertEq(vault.getPosition(BORROWER).principalWad, 20e18 - repaymentWad);
+        assertEq(token.balanceOf(BORROWER), 20e18 - repaymentWad);
+    }
+
     function testOnlyRiskAdminCanPauseBorrowingOrConfigureTheToken() public {
         vm.prank(OTHER);
         vm.expectRevert();

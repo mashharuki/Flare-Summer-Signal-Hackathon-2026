@@ -3,7 +3,10 @@ import { type Address, asAddress } from "@reserveflow/shared";
 export const COSTON2_CHAIN_ID = 114 as const;
 
 export interface Eip1193Provider {
-  request(input: { readonly method: string }): Promise<unknown>;
+  request(input: {
+    readonly method: string;
+    readonly params?: readonly unknown[];
+  }): Promise<unknown>;
 }
 
 export type WalletConnection =

@@ -1,3 +1,4 @@
+export * from "./attestation-auth.js";
 export * from "./domain.js";
 export type {
   WebRuntimeConfig,

@@ -29,3 +29,19 @@ ReserveFlow turns externally held assets into usable, verifiable credit on Flare
 
 ---
 _Focus on product behavior and decision principles; individual assets, feeds, and UI screens belong in implementation documentation._
+
+## Current MVP Boundary (Implemented)
+
+The current executable MVP is intentionally narrower than the product vision:
+
+- It supports one approved borrower, `testXRP` on XRPL Testnet, Coston2, and test-only rfUSD.
+- A verified `XRPPayment` proves one payment event, not a comprehensive external balance, address ownership, or production collateral claim.
+- FDC verification and FTSO freshness are mandatory borrowing inputs. Stale, warning, margin-call, frozen, or paused positions cannot open new debt; repayment remains available.
+- The web app explains and previews the flow. Its current values are demo snapshots, not a real-time lending interface.
+- This is not production lending, a mainnet product, or a real-asset/fiat service.
+
+## Durable Product Rules
+
+- Preserve the distinction between an off-chain proof-progress record and an on-chain verified reserve update.
+- Add assets, chains, or lending features only after defining their proof model, freshness policy, risk limits, and failure behavior.
+- Do not market an XRPL payment attestation as a proof of total reserves.
