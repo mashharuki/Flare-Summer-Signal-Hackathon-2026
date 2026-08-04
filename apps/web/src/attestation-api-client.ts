@@ -88,7 +88,7 @@ export function createAttestationApiClient(
         }),
       );
     },
-    async prepare({ accountId, transactionId }) {
+    async prepare({ accountId, transactionId, purpose, contextId }) {
       if (accountId !== options.accountId) {
         throw new Error(
           "Attestation API account does not match the connected borrower session.",
@@ -98,6 +98,8 @@ export function createAttestationApiClient(
         await call("/attestations/prepare", "POST", {
           accountId,
           transactionId,
+          ...(purpose === undefined ? {} : { purpose }),
+          ...(contextId === undefined ? {} : { contextId }),
         }),
       );
     },

@@ -5,6 +5,7 @@ import {
   type AccountId,
   type Address,
   type AttestationFailure,
+  type AttestationPurpose,
   type AttestationRecord,
   type AttestationStatus,
   asAccountId,
@@ -78,6 +79,8 @@ const SCHEMA = `
     failure_code TEXT,
     failure_message TEXT,
     core_event_tx_hash TEXT,
+    purpose TEXT,
+    context_id TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
@@ -94,6 +97,8 @@ export interface CreateAttestationRecordInput {
   readonly requestBytesHash: ProofId;
   readonly requiredFeeWei?: bigint;
   readonly txHash: TransactionHash;
+  readonly purpose?: AttestationPurpose;
+  readonly contextId?: string;
 }
 
 export interface PersistedAttestationRecord extends AttestationRecord {
@@ -129,8 +134,8 @@ export class SqliteAttestationStore {
     this.database.run(
       `INSERT OR IGNORE INTO attestation_records (
         id, account_id, tx_hash, request_bytes_hash, request_bytes, proof_owner,
-        required_fee_wei, expires_at, status, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        required_fee_wei, expires_at, purpose, context_id, status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         input.id,
         input.accountId,
@@ -140,6 +145,8 @@ export class SqliteAttestationStore {
         input.proofOwner ?? null,
         input.requiredFeeWei?.toString() ?? null,
         input.expiresAt?.toString() ?? null,
+        input.purpose ?? "RESERVE_UPDATE",
+        input.contextId ?? null,
         "READY_TO_SUBMIT",
         timestamp,
         timestamp,
@@ -320,6 +327,8 @@ export class SqliteAttestationStore {
     const requestBytes = nullableString(row.request_bytes);
     const requiredFeeWei = nullableString(row.required_fee_wei);
     const votingRoundId = nullableString(row.voting_round_id);
+    const purpose = nullableString(row.purpose);
+    const contextId = nullableString(row.context_id);
     return {
       accountId: asAccountId(requiredString(row.account_id, "account_id")),
       ...(requestTransactionHash === undefined
@@ -365,6 +374,10 @@ export class SqliteAttestationStore {
       ...(votingRoundId === undefined
         ? {}
         : { votingRoundId: BigInt(votingRoundId) }),
+      ...(purpose === undefined
+        ? {}
+        : { purpose: asAttestationPurpose(purpose) }),
+      ...(contextId === undefined ? {} : { contextId }),
     };
   }
 
@@ -410,6 +423,8 @@ function migrate(database: Database): void {
     ["proof_owner", "TEXT"],
     ["required_fee_wei", "TEXT"],
     ["expires_at", "TEXT"],
+    ["purpose", "TEXT"],
+    ["context_id", "TEXT"],
   ] as const) {
     if (!existingColumns.has(name)) {
       database.run(
@@ -482,4 +497,15 @@ function asDomainErrorCode(value: string): DomainErrorCode {
     throw new Error(`Unknown attestation failure code: ${value}.`);
   }
   return value as DomainErrorCode;
+}
+
+function asAttestationPurpose(value: string): AttestationPurpose {
+  if (
+    value === "RESERVE_UPDATE" ||
+    value === "INVOICE_SETTLEMENT" ||
+    value === "XRP_REPAYMENT"
+  ) {
+    return value;
+  }
+  throw new Error(`Unknown attestation purpose: ${value}.`);
 }

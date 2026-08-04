@@ -1,5 +1,6 @@
 import {
   type AccountId,
+  type AttestationPurpose,
   asAccountId,
   asProofId,
   asTransactionHash,
@@ -30,6 +31,8 @@ export interface AttestationApiCoordinator {
   prepare(input: {
     readonly accountId: AccountId;
     readonly transactionId: ReturnType<typeof asTransactionHash>;
+    readonly purpose?: AttestationPurpose;
+    readonly contextId?: string;
   }): Promise<PreparedXrpPaymentAttestation>;
   recordSubmitted(input: {
     readonly requestBytesHash: ProofId;
@@ -77,10 +80,14 @@ export function createAttestationApi(
           const transactionId = asTransactionHash(
             requiredString(body, "transactionId"),
           );
+          const purpose = optionalPurpose(body.purpose);
+          const contextId = optionalContextId(body.contextId);
           await dependencies.authorize({ accountId, request });
           const prepared = await dependencies.coordinator.prepare({
             accountId,
             transactionId,
+            ...(purpose === undefined ? {} : { purpose }),
+            ...(contextId === undefined ? {} : { contextId }),
           });
           return json(201, serializePrepared(prepared));
         }
@@ -199,6 +206,25 @@ function requiredString(body: Record<string, unknown>, name: string): string {
   const value = body[name];
   if (typeof value !== "string") {
     throw new Error(`${name} must be a string.`);
+  }
+  return value;
+}
+
+function optionalPurpose(value: unknown): AttestationPurpose | undefined {
+  if (value === undefined) return undefined;
+  if (
+    value === "RESERVE_UPDATE" ||
+    value === "INVOICE_SETTLEMENT" ||
+    value === "XRP_REPAYMENT"
+  )
+    return value;
+  throw new Error("purpose must be a supported attestation purpose.");
+}
+
+function optionalContextId(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(value)) {
+    throw new Error("contextId must be a 32-byte hexadecimal identifier.");
   }
   return value;
 }

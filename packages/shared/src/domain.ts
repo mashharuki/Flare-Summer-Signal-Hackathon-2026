@@ -130,6 +130,12 @@ export type AttestationStatus =
   | "FAILED"
   | "EXPIRED";
 
+/** Identifies the on-chain action that will consume an otherwise opaque FDC proof. */
+export type AttestationPurpose =
+  | "RESERVE_UPDATE"
+  | "INVOICE_SETTLEMENT"
+  | "XRP_REPAYMENT";
+
 export type DomainErrorCode =
   | "CREDIT_NOT_HEALTHY"
   | "CREDIT_LIMIT_EXCEEDED"
@@ -165,6 +171,8 @@ export interface AttestationRecord {
   readonly requestBytesHash: ProofId;
   readonly votingRoundId?: bigint;
   readonly status: AttestationStatus;
+  readonly purpose?: AttestationPurpose;
+  readonly contextId?: string;
   readonly failure?: AttestationFailure;
   readonly createdAt: bigint;
   readonly updatedAt: bigint;

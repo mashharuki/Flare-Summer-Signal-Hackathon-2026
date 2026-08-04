@@ -5,6 +5,7 @@ import {IFdcVerification} from "../src/interfaces/IFdcVerification.sol";
 import {IFlareContractRegistry} from "../src/interfaces/IFlareContractRegistry.sol";
 import {IXRPPayment} from "../src/interfaces/IXRPPayment.sol";
 import {ReserveFlowCore} from "../src/ReserveFlowCore.sol";
+import {XrpProofRegistry} from "../src/XrpProofRegistry.sol";
 
 interface VmInvariant {
     function chainId(uint256 newChainId) external;
@@ -121,6 +122,9 @@ contract ReserveFlowInvariantTest {
         vm.etch(FLARE_CONTRACT_REGISTRY, address(registry).code);
 
         core = new ReserveFlowCore(address(this));
+        XrpProofRegistry proofRegistry = new XrpProofRegistry(address(this));
+        proofRegistry.setProofConsumer(address(core), true);
+        core.setProofRegistry(proofRegistry);
         handler = new ReserveLedgerHandler(core);
         core.setBorrowerApproval(address(handler), true);
         handler.initialize();

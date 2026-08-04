@@ -5,6 +5,8 @@ import {CreditVault} from "./CreditVault.sol";
 import {MockUSD} from "./MockUSD.sol";
 import {ReserveFlowCore} from "./ReserveFlowCore.sol";
 import {RiskEngine} from "./RiskEngine.sol";
+import {InvoiceRegistry} from "./InvoiceRegistry.sol";
+import {XrpProofRegistry} from "./XrpProofRegistry.sol";
 import {IRiskEngine} from "./interfaces/IRiskEngine.sol";
 import {IReserveLedger} from "./interfaces/IReserveLedger.sol";
 
@@ -15,6 +17,8 @@ library DeploymentPlan {
         RiskEngine riskEngine;
         CreditVault vault;
         MockUSD token;
+        XrpProofRegistry proofRegistry;
+        InvoiceRegistry invoiceRegistry;
     }
 
     error InvalidApprovedBorrower();
@@ -28,6 +32,11 @@ library DeploymentPlan {
         }
 
         deployment.core = new ReserveFlowCore(riskAdmin);
+        deployment.proofRegistry = new XrpProofRegistry(riskAdmin);
+        deployment.proofRegistry.setProofConsumer(address(deployment.core), true);
+        deployment.core.setProofRegistry(deployment.proofRegistry);
+        deployment.invoiceRegistry = new InvoiceRegistry(riskAdmin, address(deployment.core));
+        deployment.core.setInvoiceRegistry(deployment.invoiceRegistry);
         deployment.riskEngine = new RiskEngine(riskAdmin, IReserveLedger(address(deployment.core)));
         deployment.vault = new CreditVault(
             riskAdmin, IReserveLedger(address(deployment.core)), IRiskEngine(address(deployment.riskEngine))

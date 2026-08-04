@@ -2,6 +2,7 @@ import {
   type AccountId,
   type Address,
   type AttestationFailure,
+  type AttestationPurpose,
   asProofId,
   type ProofId,
   type TransactionHash,
@@ -135,6 +136,8 @@ export class XrpPaymentAttestationCoordinator {
   public async prepare(input: {
     readonly accountId: AccountId;
     readonly transactionId: TransactionHash;
+    readonly purpose?: AttestationPurpose;
+    readonly contextId?: string;
   }): Promise<PreparedXrpPaymentAttestation> {
     const account = await this.dependencies.accountReader.getReserveAccount(
       input.accountId,
@@ -172,6 +175,8 @@ export class XrpPaymentAttestationCoordinator {
       requestBytesHash,
       requiredFeeWei,
       txHash: input.transactionId,
+      ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
+      ...(input.contextId === undefined ? {} : { contextId: input.contextId }),
     });
     return preparedFromRecord(record);
   }

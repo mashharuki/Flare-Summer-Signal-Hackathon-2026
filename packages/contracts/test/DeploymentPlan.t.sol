@@ -73,6 +73,8 @@ contract DeploymentPlanTest {
         DeploymentPlan.Deployment memory deployment = DeploymentPlan.deploy(address(this), APPROVED_BORROWER, config);
 
         assertEq(address(deployment.core.fdcVerification()), address(verifier));
+        assertEq(address(deployment.core.proofRegistry()), address(deployment.proofRegistry));
+        assertEq(address(deployment.core.invoiceRegistry()), address(deployment.invoiceRegistry));
         assertEq(address(deployment.riskEngine.reserveLedger()), address(deployment.core));
         assertEq(address(deployment.vault.reserveLedger()), address(deployment.core));
         assertEq(address(deployment.vault.riskEngine()), address(deployment.riskEngine));

@@ -38,6 +38,9 @@ contract CreditVault is AccessControl {
     error InsufficientRfUsdAllowance(uint256 availableAllowance, uint256 requiredAmount);
     error InsufficientRfUsdBalance(uint256 availableBalance, uint256 requiredAmount);
     error RfUsdTransferFailed();
+    error RepaymentRouterAlreadySet();
+    error UnauthorizedRepaymentRouter(address caller);
+    error RepaymentReserved(uint256 availableWad, uint256 requestedWad);
 
     event TokenConfigured(address indexed token);
     event CreditLineOpened(address indexed borrower, bytes32 indexed accountId, uint64 openedAt);
@@ -45,13 +48,17 @@ contract CreditVault is AccessControl {
     event Repaid(address indexed borrower, bytes32 indexed accountId, uint256 amountWad, uint256 principalWad);
     event BorrowingPausedUpdated(bool paused);
     event RiskSynced(address indexed borrower, bytes32 indexed accountId, IRiskEngine.RiskStatus status, uint64 syncedAt);
+    event XrpRepaid(address indexed borrower, bytes32 indexed accountId, uint256 amountWad, uint256 principalWad);
+    event RepaymentRouterConfigured(address indexed router);
 
     IReserveLedger public immutable reserveLedger;
     IRiskEngine public immutable riskEngine;
     IERC20 public token;
+    address public repaymentRouter;
     bool public borrowingPaused;
 
     mapping(address borrower => CreditPosition position) private positions;
+    mapping(address borrower => uint256 amountWad) public pendingXrpRepayments;
 
     constructor(address riskAdmin, IReserveLedger reserveLedger_, IRiskEngine riskEngine_) {
         if (block.chainid != COSTON2_CHAIN_ID) {
@@ -82,6 +89,13 @@ contract CreditVault is AccessControl {
     function setBorrowingPaused(bool paused) external onlyRole(RISK_ADMIN_ROLE) {
         borrowingPaused = paused;
         emit BorrowingPausedUpdated(paused);
+    }
+
+    function setRepaymentRouter(address router) external onlyRole(RISK_ADMIN_ROLE) {
+        if (router == address(0)) revert ZeroAddress();
+        if (repaymentRouter != address(0)) revert RepaymentRouterAlreadySet();
+        repaymentRouter = router;
+        emit RepaymentRouterConfigured(router);
     }
 
     function openCreditLine(bytes32 accountId) external {
@@ -142,6 +156,10 @@ contract CreditVault is AccessControl {
         if (amountWad > position.principalWad) {
             revert ExcessRepayment(position.principalWad, amountWad);
         }
+        uint256 availableForRfUsdRepayment = position.principalWad - pendingXrpRepayments[msg.sender];
+        if (amountWad > availableForRfUsdRepayment) {
+            revert RepaymentReserved(availableForRfUsdRepayment, amountWad);
+        }
         uint256 allowance = token.allowance(msg.sender, address(this));
         if (allowance < amountWad) {
             revert InsufficientRfUsdAllowance(allowance, amountWad);
@@ -164,6 +182,37 @@ contract CreditVault is AccessControl {
         IRiskEngine.RiskSnapshot memory snapshot = riskEngine.getRiskSnapshot(position.reserveAccountId, position.principalWad);
         position.lastRiskSyncAt = uint64(block.timestamp);
         emit RiskSynced(msg.sender, position.reserveAccountId, snapshot.status, uint64(block.timestamp));
+    }
+
+    /// @notice Decreases principal after XrpRepaymentRouter has verified an FDC XRPL payment.
+    function settleXrpRepayment(address borrower, uint256 amountWad) external {
+        if (msg.sender != repaymentRouter) revert UnauthorizedRepaymentRouter(msg.sender);
+        if (amountWad == 0) revert ZeroAmount();
+        CreditPosition storage position = _position(borrower);
+        if (amountWad > pendingXrpRepayments[borrower]) {
+            revert RepaymentReserved(pendingXrpRepayments[borrower], amountWad);
+        }
+        if (amountWad > position.principalWad) revert ExcessRepayment(position.principalWad, amountWad);
+        pendingXrpRepayments[borrower] -= amountWad;
+        position.principalWad -= amountWad;
+        position.lastRiskSyncAt = uint64(block.timestamp);
+        emit XrpRepaid(borrower, position.reserveAccountId, amountWad, position.principalWad);
+    }
+
+    function reserveXrpRepayment(address borrower, uint256 amountWad) external {
+        if (msg.sender != repaymentRouter) revert UnauthorizedRepaymentRouter(msg.sender);
+        CreditPosition storage position = _position(borrower);
+        uint256 available = position.principalWad - pendingXrpRepayments[borrower];
+        if (amountWad == 0 || amountWad > available) revert RepaymentReserved(available, amountWad);
+        pendingXrpRepayments[borrower] += amountWad;
+    }
+
+    function releaseXrpRepayment(address borrower, uint256 amountWad) external {
+        if (msg.sender != repaymentRouter) revert UnauthorizedRepaymentRouter(msg.sender);
+        if (amountWad > pendingXrpRepayments[borrower]) {
+            revert RepaymentReserved(pendingXrpRepayments[borrower], amountWad);
+        }
+        pendingXrpRepayments[borrower] -= amountWad;
     }
 
     function getPosition(address borrower) external view returns (CreditPosition memory) {

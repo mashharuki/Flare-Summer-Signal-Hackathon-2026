@@ -6,6 +6,8 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {IFdcVerification} from "./interfaces/IFdcVerification.sol";
 import {IFlareContractRegistry} from "./interfaces/IFlareContractRegistry.sol";
 import {IXRPPayment} from "./interfaces/IXRPPayment.sol";
+import {IInvoiceRegistry} from "./interfaces/IInvoiceRegistry.sol";
+import {IXrpProofRegistry} from "./interfaces/IXrpProofRegistry.sol";
 
 /// @notice Coston2 reserve ledger updated only by FDC-verified XRPL Testnet payments.
 contract ReserveFlowCore is AccessControl {
@@ -50,6 +52,9 @@ contract ReserveFlowCore is AccessControl {
     error InsufficientReserveBalance(uint256 balanceDrops, uint256 withdrawalDrops);
     error ProofAlreadyUsed(bytes32 proofId);
     error OutOfOrderLedger(uint64 lastLedger, uint64 submittedLedger);
+    error ProofRegistryNotConfigured();
+    error InvoiceRegistryNotConfigured();
+    error IntegrationAlreadyConfigured();
 
     event BorrowerApprovalUpdated(address indexed borrower, bool approved);
     event ReserveAccountRegistered(
@@ -66,8 +71,12 @@ contract ReserveFlowCore is AccessControl {
         uint64 externalLedger,
         uint64 attestedAt
     );
+    event ProofRegistryConfigured(address indexed proofRegistry);
+    event InvoiceRegistryConfigured(address indexed invoiceRegistry);
 
     IFdcVerification public immutable fdcVerification;
+    IXrpProofRegistry public proofRegistry;
+    IInvoiceRegistry public invoiceRegistry;
 
     mapping(address borrower => bool approved) public approvedBorrowers;
     mapping(bytes32 accountId => ReserveAccount account) private reserveAccounts;
@@ -98,6 +107,20 @@ contract ReserveFlowCore is AccessControl {
 
         approvedBorrowers[borrower] = approved;
         emit BorrowerApprovalUpdated(borrower, approved);
+    }
+
+    function setProofRegistry(IXrpProofRegistry registry) external onlyRole(RISK_ADMIN_ROLE) {
+        if (address(registry) == address(0)) revert ZeroAddress();
+        if (address(proofRegistry) != address(0)) revert IntegrationAlreadyConfigured();
+        proofRegistry = registry;
+        emit ProofRegistryConfigured(address(registry));
+    }
+
+    function setInvoiceRegistry(IInvoiceRegistry registry) external onlyRole(RISK_ADMIN_ROLE) {
+        if (address(registry) == address(0)) revert ZeroAddress();
+        if (address(invoiceRegistry) != address(0)) revert IntegrationAlreadyConfigured();
+        invoiceRegistry = registry;
+        emit InvoiceRegistryConfigured(address(registry));
     }
 
     function registerReserveAccount(bytes32 externalAddressHash) external returns (bytes32 accountId) {
@@ -189,9 +212,7 @@ contract ReserveFlowCore is AccessControl {
             revert InvalidPaymentStatus(response.responseBody.status);
         }
         bytes32 proofId = keccak256(abi.encode(response.sourceId, response.requestBody.transactionId));
-        if (usedProofs[proofId]) {
-            revert ProofAlreadyUsed(proofId);
-        }
+        _consumeProof(proofId);
         if (response.responseBody.blockNumber <= account.lastExternalLedger) {
             revert OutOfOrderLedger(account.lastExternalLedger, response.responseBody.blockNumber);
         }
@@ -214,7 +235,6 @@ contract ReserveFlowCore is AccessControl {
             account.balanceDrops -= amountDrops;
         }
 
-        usedProofs[proofId] = true;
         account.lastExternalLedger = response.responseBody.blockNumber;
         account.lastAttestedAt = response.responseBody.blockTimestamp;
 
@@ -222,6 +242,53 @@ contract ReserveFlowCore is AccessControl {
             accountId,
             proofId,
             incoming,
+            amountDrops,
+            account.balanceDrops,
+            account.lastExternalLedger,
+            account.lastAttestedAt
+        );
+    }
+
+    /// @notice Atomically records a verified incoming revenue payment and settles its invoice.
+    function submitInvoicePaymentProof(bytes32 accountId, bytes32 invoiceId, IXRPPayment.Proof calldata proof) external {
+        ReserveAccount storage account = _account(accountId);
+        if (account.status != AccountStatus.ACTIVE) revert AccountNotActive(accountId, account.status);
+        if (msg.sender != account.borrower) revert UnauthorizedProofSubmitter(account.borrower, msg.sender);
+        if (address(invoiceRegistry) == address(0)) revert InvoiceRegistryNotConfigured();
+        if (!fdcVerification.verifyXRPPayment(proof)) revert InvalidFdcProof();
+
+        IXRPPayment.Response calldata response = proof.data;
+        if (response.sourceId != TEST_XRP_SOURCE_ID) revert UnsupportedProofSource(response.sourceId);
+        if (response.requestBody.proofOwner != account.borrower) {
+            revert ProofOwnerMismatch(account.borrower, response.requestBody.proofOwner);
+        }
+        if (response.responseBody.status != XRPL_PAYMENT_SUCCESS) revert InvalidPaymentStatus(response.responseBody.status);
+        if (response.responseBody.receivingAddressHash != account.externalAddressHash) {
+            revert AccountAddressMismatch(account.externalAddressHash);
+        }
+        uint256 amountDrops = _positiveAmount(response.responseBody.receivedAmount);
+        bytes32 proofId = keccak256(abi.encode(response.sourceId, response.requestBody.transactionId));
+        if (response.responseBody.blockNumber <= account.lastExternalLedger) {
+            revert OutOfOrderLedger(account.lastExternalLedger, response.responseBody.blockNumber);
+        }
+
+        _consumeProof(proofId);
+        invoiceRegistry.settleFromCore(
+            invoiceId,
+            proofId,
+            response.responseBody.sourceAddressHash,
+            amountDrops,
+            response.responseBody.blockTimestamp,
+            keccak256(response.responseBody.firstMemoData)
+        );
+
+        account.balanceDrops += amountDrops;
+        account.lastExternalLedger = response.responseBody.blockNumber;
+        account.lastAttestedAt = response.responseBody.blockTimestamp;
+        emit ReserveUpdated(
+            accountId,
+            proofId,
+            true,
             amountDrops,
             account.balanceDrops,
             account.lastExternalLedger,
@@ -241,5 +308,12 @@ contract ReserveFlowCore is AccessControl {
             revert InvalidPaymentAmount();
         }
         return uint256(value);
+    }
+
+    function _consumeProof(bytes32 proofId) private {
+        if (address(proofRegistry) == address(0)) revert ProofRegistryNotConfigured();
+        if (usedProofs[proofId]) revert ProofAlreadyUsed(proofId);
+        proofRegistry.consume(proofId);
+        usedProofs[proofId] = true;
     }
 }

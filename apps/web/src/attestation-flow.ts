@@ -1,6 +1,7 @@
 import type {
   AccountId,
   Address,
+  AttestationPurpose,
   AttestationStatus,
   ProofId,
   TransactionHash,
@@ -22,6 +23,8 @@ export interface AttestationApiClient {
   prepare(input: {
     readonly accountId: AccountId;
     readonly transactionId: TransactionHash;
+    readonly purpose?: AttestationPurpose;
+    readonly contextId?: string;
   }): Promise<PreparedAttestation>;
   recordSubmitted(input: {
     readonly requestBytesHash: ProofId;
@@ -57,6 +60,8 @@ export interface AttestationFlowInput {
   readonly accountId: AccountId;
   readonly borrower: Address;
   readonly transactionId: TransactionHash;
+  readonly purpose?: AttestationPurpose;
+  readonly contextId?: string;
 }
 
 /**
@@ -81,6 +86,10 @@ export function createAttestationFlow(
       const prepared = await dependencies.api.prepare({
         accountId: input.accountId,
         transactionId: input.transactionId,
+        ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
+        ...(input.contextId === undefined
+          ? {}
+          : { contextId: input.contextId }),
       });
       if (prepared.proofOwner.toLowerCase() !== input.borrower.toLowerCase()) {
         throw new Error(

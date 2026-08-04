@@ -5,6 +5,7 @@ import {IFdcVerification} from "../src/interfaces/IFdcVerification.sol";
 import {IFlareContractRegistry} from "../src/interfaces/IFlareContractRegistry.sol";
 import {IXRPPayment} from "../src/interfaces/IXRPPayment.sol";
 import {ReserveFlowCore} from "../src/ReserveFlowCore.sol";
+import {XrpProofRegistry} from "../src/XrpProofRegistry.sol";
 
 interface VmReserve {
     function chainId(uint256 newChainId) external;
@@ -52,6 +53,7 @@ contract ReserveFlowCoreTest {
     MockFdcVerification internal verifier;
     MockContractRegistryReserve internal contractRegistry;
     ReserveFlowCore internal core;
+    XrpProofRegistry internal proofRegistry;
     bytes32 internal accountId;
 
     function setUp() public {
@@ -60,6 +62,9 @@ contract ReserveFlowCoreTest {
         contractRegistry = new MockContractRegistryReserve(verifier);
         vm.etch(FLARE_CONTRACT_REGISTRY, address(contractRegistry).code);
         core = new ReserveFlowCore(address(this));
+        proofRegistry = new XrpProofRegistry(address(this));
+        proofRegistry.setProofConsumer(address(core), true);
+        core.setProofRegistry(proofRegistry);
         core.setBorrowerApproval(BORROWER, true);
 
         vm.prank(BORROWER);
