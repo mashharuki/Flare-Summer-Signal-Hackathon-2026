@@ -8,6 +8,7 @@ import {ITestFtsoV2} from "../src/interfaces/ITestFtsoV2.sol";
 import {IXRPPayment} from "../src/interfaces/IXRPPayment.sol";
 import {MockUSD} from "../src/MockUSD.sol";
 import {RiskEngine} from "../src/RiskEngine.sol";
+import {XrpRepaymentRouter} from "../src/XrpRepaymentRouter.sol";
 
 interface VmDeployment {
     function chainId(uint256 newChainId) external;
@@ -85,12 +86,44 @@ contract DeploymentPlanTest {
         assertFalse(deployment.token.hasRole(deployment.token.MINTER_ROLE(), address(this)));
     }
 
+    function testConfiguresTheExactXrplCollectionAddressHashForNativeXrpRepayment() public {
+        vm.chainId(114);
+        MockFdcVerificationDeployment verifier = new MockFdcVerificationDeployment();
+        MockTestFtsoV2Deployment ftso = new MockTestFtsoV2Deployment();
+        MockContractRegistryDeployment registry = new MockContractRegistryDeployment(verifier, ftso);
+        vm.etch(FLARE_CONTRACT_REGISTRY, address(registry).code);
+        bytes32 collectionHash = keccak256(bytes("rELiPixQHM5NLgMqXovBmwZCYw6tFKZxh8"));
+
+        DeploymentPlan.Deployment memory deployment = DeploymentPlan.deployWithXrpRepayment(
+            address(this), APPROVED_BORROWER, _config(), collectionHash
+        );
+
+        assertTrue(address(deployment.repaymentRouter) != address(0));
+        assertEq(deployment.repaymentRouter.collectionAddressHash(), collectionHash);
+        assertEq(deployment.vault.repaymentRouter(), address(deployment.repaymentRouter));
+    }
+
+    function _config() private pure returns (RiskEngine.RiskConfig memory) {
+        return RiskEngine.RiskConfig({
+            haircutBps: 3_000,
+            advanceRateBps: 5_000,
+            priceTtlSeconds: 60,
+            reserveTtlSeconds: 900,
+            warningHealthBps: 12_000,
+            marginCallHealthBps: 10_000
+        });
+    }
+
     function assertEq(address actual, address expected) internal pure {
         require(actual == expected, "assertion failed: addresses differ");
     }
 
     function assertEq(uint256 actual, uint256 expected) internal pure {
         require(actual == expected, "assertion failed: uints differ");
+    }
+
+    function assertEq(bytes32 actual, bytes32 expected) internal pure {
+        require(actual == expected, "assertion failed: bytes32 differ");
     }
 
     function assertTrue(bool condition) internal pure {

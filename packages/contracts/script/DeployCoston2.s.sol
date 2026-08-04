@@ -31,10 +31,14 @@ contract DeployCoston2 {
         uint256 deployerPrivateKey = VM.envUint("DEPLOYER_PRIVATE_KEY");
         address riskAdmin = VM.addr(deployerPrivateKey);
         address approvedBorrower = VM.envAddress("DEMO_BORROWER_ADDRESS");
+        string memory collectionAddress = VM.envOr("XRPL_TESTNET_COLLECTION_ADDRESS", "");
+        require(bytes(collectionAddress).length > 0, "XRPL_TESTNET_COLLECTION_ADDRESS is required");
         string memory outputPath = VM.envOr("DEPLOYMENT_OUTPUT_PATH", "deployments/coston2.local.json");
 
         VM.startBroadcast(deployerPrivateKey);
-        deployment = DeploymentPlan.deploy(riskAdmin, approvedBorrower, _initialRiskConfig());
+        deployment = DeploymentPlan.deployWithXrpRepayment(
+            riskAdmin, approvedBorrower, _initialRiskConfig(), keccak256(bytes(collectionAddress))
+        );
         VM.stopBroadcast();
 
         _writePublicConfig(outputPath, riskAdmin, approvedBorrower, deployment);
@@ -68,6 +72,10 @@ contract DeployCoston2 {
         json = VM.serializeAddress(objectKey, "riskEngine", address(deployment.riskEngine));
         json = VM.serializeAddress(objectKey, "creditVault", address(deployment.vault));
         json = VM.serializeAddress(objectKey, "rfUsd", address(deployment.token));
+        json = VM.serializeAddress(objectKey, "xrpProofRegistry", address(deployment.proofRegistry));
+        json = VM.serializeAddress(objectKey, "invoiceRegistry", address(deployment.invoiceRegistry));
+        json = VM.serializeAddress(objectKey, "xrpRepaymentRouter", address(deployment.repaymentRouter));
+        json = VM.serializeString(objectKey, "xrplTestnetCollectionAddress", VM.envOr("XRPL_TESTNET_COLLECTION_ADDRESS", ""));
         VM.writeJson(json, outputPath);
     }
 }

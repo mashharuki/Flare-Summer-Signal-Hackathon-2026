@@ -7,6 +7,7 @@ import {ReserveFlowCore} from "./ReserveFlowCore.sol";
 import {RiskEngine} from "./RiskEngine.sol";
 import {InvoiceRegistry} from "./InvoiceRegistry.sol";
 import {XrpProofRegistry} from "./XrpProofRegistry.sol";
+import {XrpRepaymentRouter} from "./XrpRepaymentRouter.sol";
 import {IRiskEngine} from "./interfaces/IRiskEngine.sol";
 import {IReserveLedger} from "./interfaces/IReserveLedger.sol";
 
@@ -19,6 +20,7 @@ library DeploymentPlan {
         MockUSD token;
         XrpProofRegistry proofRegistry;
         InvoiceRegistry invoiceRegistry;
+        XrpRepaymentRouter repaymentRouter;
     }
 
     error InvalidApprovedBorrower();
@@ -46,5 +48,26 @@ library DeploymentPlan {
         deployment.vault.setToken(deployment.token);
         deployment.core.setBorrowerApproval(approvedBorrower, true);
         deployment.riskEngine.setRiskConfig(initialRiskConfig);
+    }
+
+    function deployWithXrpRepayment(
+        address riskAdmin,
+        address approvedBorrower,
+        RiskEngine.RiskConfig memory initialRiskConfig,
+        bytes32 collectionAddressHash
+    ) internal returns (Deployment memory deployment) {
+        if (collectionAddressHash == bytes32(0)) revert InvalidApprovedBorrower();
+        deployment = deploy(riskAdmin, approvedBorrower, initialRiskConfig);
+        deployment.repaymentRouter = new XrpRepaymentRouter(
+            deployment.vault,
+            deployment.core.fdcVerification(),
+            deployment.riskEngine.priceFeed(),
+            deployment.proofRegistry,
+            deployment.riskEngine.XRP_USD_FEED_ID(),
+            collectionAddressHash,
+            deployment.riskEngine.getRiskConfig().priceTtlSeconds
+        );
+        deployment.proofRegistry.setProofConsumer(address(deployment.repaymentRouter), true);
+        deployment.vault.setRepaymentRouter(address(deployment.repaymentRouter));
     }
 }
